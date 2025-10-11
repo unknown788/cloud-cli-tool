@@ -1,0 +1,12 @@
+# Python virtual environment
+venv/
+
+# Secret credentials file
+.env
+
+# Python caches
+__pycache__/
+*.pyc
+
+state.json
+sample_app/index.html
