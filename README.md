@@ -11,7 +11,7 @@ This recording shows the tool's full workflow:
 2.  `deploy`: Deploying the dynamic web application using Docker.
 3.  `destroy`: Tearing down all cloud resources.
 
-[![vmlaunch.404by.me]](https://vmlaunch.404by.me/)
+[vmlaunch.404by.me](https://vmlaunch.404by.me/)
 
 ---
 
