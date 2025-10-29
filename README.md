@@ -40,28 +40,11 @@ graph TD
     style G fill:#FEF9E7,stroke:#F1C40F
 
 
----
-##  Workflow Architecture
-
-This tool automates a 3-step process, all managed from a single CLI.
-
-[Image of a workflow diagram showing a developer running the CLI. 
-Step 1 'provision' points to an Azure cloud icon containing a VM, VNet, and NSG. 
-Step 2 'deploy' shows Docker and a code icon pointing to the VM. 
-Step 3 'destroy' shows the Azure resources being deleted.]
-
-1.  **Provision:** The `provision` command communicates with the Azure Resource Manager (ARM) API using the Azure SDK to build all necessary resources (VM, VNet, Public IP, NSG) based on the Python script's logic.
-2.  **Deploy:** The `deploy` command:
-    * Generates a dynamic `index.html` dashboard.
-    * Connects to the VM via SSH (Paramiko).
-    * Installs Docker on the remote VM.
-    * Uploads the `Dockerfile` and the generated web application.
-    * Builds a new Nginx Docker image on the VM.
-    * Runs the container, mapping port 80 to serve the web dashboard.
-3.  **Destroy:** The `destroy` command calls the Azure CLI to delete the entire resource group, removing all created resources and stopping all costs.
 
 ---
 
+
+```markdown
 ## Core Features
 
 * **Infrastructure as Code (IaC):** Manages all cloud resources programmatically, ensuring repeatable and consistent environments.
@@ -92,7 +75,7 @@ Step 3 'destroy' shows the Azure resources being deleted.]
 ### 2. Clone & Install
 ```bash
 # Clone the repository
-git clone https://github.com/unknown788/cloud-cli-tool.git
+git clone <your-repo-link-here>
 cd cloud-cli-tool
 
 # Create a virtual environment
@@ -101,7 +84,3 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
-
-
-
-
