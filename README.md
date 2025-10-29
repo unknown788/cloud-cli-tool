@@ -1,17 +1,8 @@
 # Cloud Provisioning & Deployment CLI 🚀
 
-A Python-based command-line tool that automates the entire lifecycle of cloud infrastructure on Azure. This tool provisions a complete VM stack from scratch, deploys a containerized web application, and tears down all resources with a single set of commands.
-
----
-
-## ✨ Live Demo
-
-This recording shows the tool's full workflow:
-1.  `provision`: Building the entire cloud infrastructure.
-2.  `deploy`: Deploying the dynamic web application using Docker.
-3.  `destroy`: Tearing down all cloud resources.
-
 [![Live Demo](https://img.shields.io/badge/Live_Demo-vmlaunch.404by.me-blue?style=for-the-badge&logo=vercel)](http://vmlaunch.404by.me/)
+
+A Python-based command-line tool that automates the entire lifecycle of cloud infrastructure on Azure. This tool provisions a complete VM stack from scratch, deploys a containerized web application, and tears down all resources with a single set of commands.
 
 ---
 
@@ -47,7 +38,6 @@ graph TD
     style B fill:#D5F5E3,stroke:#2ECC71
     style F fill:#FDEDEC,stroke:#E74C3C
     style G fill:#FEF9E7,stroke:#F1C40F
-
 ##  Workflow Architecture
 
 This tool automates a 3-step process, all managed from a single CLI.
