@@ -15,6 +15,39 @@ This recording shows the tool's full workflow:
 
 ---
 
+## 🏛️ Architecture
+
+This diagram shows the workflow of the CLI tool and its interaction with Azure.
+
+```mermaid
+graph TD
+    A[Developer] -- runs --> B(Python CLI Tool)
+
+    subgraph "CLI Commands"
+        B -- 'provision' --> C{Azure SDK}
+        B -- 'deploy' --> D{Paramiko SSH}
+        B -- 'destroy' --> E{Azure CLI}
+    end
+
+    subgraph "Azure Cloud Resources"
+        F[Azure Resource Manager API]
+        G((VM - Ubuntu Server))
+        H[Docker/Nginx Container]
+        I[VNet, Public IP, NSG]
+    end
+
+    C -- provisions --> F
+    F -- creates --> I
+    F -- creates --> G
+    D -- connects & deploys to --> G
+    G -- runs --> H
+    E -- deletes --> F
+
+    style A fill:#D6EAF8,stroke:#3498DB
+    style B fill:#D5F5E3,stroke:#2ECC71
+    style F fill:#FDEDEC,stroke:#E74C3C
+    style G fill:#FEF9E7,stroke:#F1C40F
+
 ##  Workflow Architecture
 
 This tool automates a 3-step process, all managed from a single CLI.
