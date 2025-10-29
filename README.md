@@ -9,7 +9,6 @@ A Python-based command-line tool that automates the entire lifecycle of cloud in
 ## 🏛️ Architecture
 
 This diagram shows the workflow of the CLI tool and its interaction with Azure.
-
 ```mermaid
 graph TD
     A[Developer] -- runs --> B(Python CLI Tool)
@@ -38,12 +37,9 @@ graph TD
     style B fill:#D5F5E3,stroke:#2ECC71
     style F fill:#FDEDEC,stroke:#E74C3C
     style G fill:#FEF9E7,stroke:#F1C40F
-
-
+```
 ---
 
-
-```markdown
 ## Core Features
 
 * **Infrastructure as Code (IaC):** Manages all cloud resources programmatically, ensuring repeatable and consistent environments.
