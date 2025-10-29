@@ -33,10 +33,11 @@ graph TD
     G -- runs --> H
     E -- deletes --> F
 
-    style A fill:#D6EAF8,stroke:#3498DB
-    style B fill:#D5F5E3,stroke:#2ECC71
-    style F fill:#FDEDEC,stroke:#E74C3C
-    style G fill:#FEF9E7,stroke:#F1C40F
+    %% Added 'color:#333' for better text readability in light mode
+    style A fill:#D6EAF8,stroke:#3498DB,color:#333
+    style B fill:#D5F5E3,stroke:#2ECC71,color:#333
+    style F fill:#FDEDEC,stroke:#E74C3C,color:#333
+    style G fill:#FEF9E7,stroke:#F1C40F,color:#333
 ```
 ---
 
