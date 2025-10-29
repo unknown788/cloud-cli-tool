@@ -11,7 +11,7 @@ This recording shows the tool's full workflow:
 2.  `deploy`: Deploying the dynamic web application using Docker.
 3.  `destroy`: Tearing down all cloud resources.
 
-[![asciicast](https://asciinema.org/a/YOUR_DEMO_LINK_HERE.svg)](https://asciinema.org/a/YOUR_DEMO_LINK_HERE)
+[![vmlaunch.404by.me]](https://vmlaunch.404by.me/)
 
 ---
 
@@ -66,7 +66,7 @@ Step 3 'destroy' shows the Azure resources being deleted.]
 ### 2. Clone & Install
 ```bash
 # Clone the repository
-git clone <your-repo-link>
+git clone https://github.com/unknown788/cloud-cli-tool.git
 cd cloud-cli-tool
 
 # Create a virtual environment
