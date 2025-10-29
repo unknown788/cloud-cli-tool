@@ -70,7 +70,7 @@ graph TD
 ### 2. Clone & Install
 ```bash
 # Clone the repository
-git clone <your-repo-link-here>
+git clone https://github.com/unknown788/cloud-cli-tool.git
 cd cloud-cli-tool
 
 # Create a virtual environment
