@@ -38,6 +38,9 @@ graph TD
     style B fill:#D5F5E3,stroke:#2ECC71
     style F fill:#FDEDEC,stroke:#E74C3C
     style G fill:#FEF9E7,stroke:#F1C40F
+
+
+---
 ##  Workflow Architecture
 
 This tool automates a 3-step process, all managed from a single CLI.
