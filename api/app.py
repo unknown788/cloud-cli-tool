@@ -12,7 +12,7 @@ Endpoints:
   GET  /status                   — real-time VM state from cloud API
   GET  /jobs                     — list all jobs
   GET  /jobs/{job_id}            — full job detail (logs + status)
-  WS   /ws/{job_id}              — Phase 5: live log streaming (stub here)
+  WS   /ws/{job_id}              — live log streaming over WebSocket
 
 Design decisions:
   - All mutations are async (background thread) and return 202 immediately.
@@ -28,10 +28,12 @@ Design decisions:
 
 import json
 import os
+import asyncio
+import functools
 from pathlib import Path
 from typing import List
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -344,19 +346,158 @@ def get_job(job_id: str):
 
 
 # ---------------------------------------------------------------------------
-# WebSocket stub (Phase 5 will replace this)
+# WebSocket — live log streaming
 # ---------------------------------------------------------------------------
 
 @app.websocket("/ws/{job_id}")
-async def websocket_logs(websocket, job_id: str):
+async def websocket_logs(websocket: WebSocket, job_id: str):
     """
-    Phase 5 placeholder.
-    Real implementation in Phase 5: drain job.log_queue in an async loop.
+    Stream real-time log lines for a running (or completed) job.
+
+    Protocol — every message is a JSON frame:
+
+      {"type": "log",      "data": "<log line>"}
+        Emitted for each log line as the provider produces it.
+
+      {"type": "status",   "data": "running"|"succeeded"|"failed"}
+        Emitted when job status transitions.  Sent once at connect
+        (current state) and again when the job finishes.
+
+      {"type": "result",   "data": { ...state dict... }}
+        Emitted on provision success — contains the public IP etc.
+        Null for deploy/destroy jobs.
+
+      {"type": "error",    "data": "<error message>"}
+        Emitted if the job fails, then the connection closes.
+
+      {"type": "done"}
+        Final frame — no more data.  Client should close the socket.
+
+      {"type": "ping"}
+        Heartbeat sent every 15 s while the job is still running.
+        Keeps the connection alive through proxies / load balancers.
+
+    Late-join behaviour:
+      If a client connects after the job has already produced log lines
+      (or even after it has finished), all historical logs are replayed
+      first, then live streaming continues (or "done" is sent immediately
+      if the job is already complete).
+
+    Threading bridge:
+      The provider runs in a daemon thread and writes to job.log_queue
+      (a stdlib queue.Queue).  This async handler must NOT block the
+      event loop, so it reads from the queue using run_in_executor(),
+      which offloads the blocking queue.get(timeout=…) call to a thread
+      pool thread — leaving the event loop free to serve other requests.
     """
-    from fastapi import WebSocket
     await websocket.accept()
-    await websocket.send_text(
-        f'{{"type":"info","data":"WebSocket streaming coming in Phase 5. '
-        f'Poll GET /jobs/{job_id} for status."}}'
-    )
+
+    job = job_store.get(job_id)
+    if not job:
+        await websocket.send_text(
+            json.dumps({"type": "error", "data": f"Job '{job_id}' not found."})
+        )
+        await websocket.close(code=4004)
+        return
+
+    loop = asyncio.get_event_loop()
+
+    async def send(frame: dict) -> None:
+        """Send a JSON frame, silently swallow disconnect errors."""
+        try:
+            await websocket.send_text(json.dumps(frame))
+        except WebSocketDisconnect:
+            pass
+
+    # ------------------------------------------------------------------
+    # 1. Replay history — so late-joining clients see everything already
+    #    emitted before they connected.
+    #
+    #    We snapshot job.logs under the assumption that the background
+    #    thread may still be appending.  We record how many lines we
+    #    replayed (history_count) so we know how many items to skip
+    #    from the live queue below — those items are duplicates.
+    # ------------------------------------------------------------------
+    history_snapshot = list(job.logs)   # atomic snapshot (GIL protects list copy)
+    history_count = len(history_snapshot)
+    for line in history_snapshot:
+        await send({"type": "log", "data": line})
+
+    # Send current status so the client knows where we are
+    await send({"type": "status", "data": job.status.value})
+
+    # ------------------------------------------------------------------
+    # 2. If the job is already finished, send result/error + done frame
+    #    and close immediately.  No need to wait on the queue.
+    # ------------------------------------------------------------------
+    if job.status in (JobStatus.SUCCEEDED, JobStatus.FAILED):
+        if job.result:
+            await send({"type": "result", "data": job.result})
+        if job.error:
+            await send({"type": "error", "data": job.error})
+        await send({"type": "done"})
+        await websocket.close()
+        return
+
+    # ------------------------------------------------------------------
+    # 3. Job is still running — drain the queue in real time.
+    #
+    #    The queue contains ALL lines the background thread has written
+    #    since the job started — including the ones we just replayed from
+    #    job.logs.  We skip the first `history_count` items so we don't
+    #    send duplicates, then stream everything new as it arrives.
+    #
+    #    We use run_in_executor() to call queue.get(timeout=15) in a
+    #    thread pool.  This blocks that pool thread for up to 15 s while
+    #    the event loop remains free.  If the timeout fires we send a
+    #    heartbeat ping and retry — this keeps proxies alive.
+    # ------------------------------------------------------------------
+    def _blocking_get() -> object:
+        """
+        Called in a thread pool.  Blocks until a log line (str) or the
+        sentinel (None) arrives, or times out after 15 s.
+        Returns the item, or raises queue.Empty on timeout.
+        """
+        return job.log_queue.get(timeout=15)
+
+    skipped = 0   # count of already-replayed items we consume but don't send
+
+    try:
+        while True:
+            try:
+                item = await loop.run_in_executor(None, _blocking_get)
+            except asyncio.CancelledError:
+                # Client disconnected while we were waiting — clean exit.
+                break
+            except Exception:
+                # queue.Empty (15 s timeout) — send heartbeat and retry.
+                await send({"type": "ping"})
+                continue
+
+            if item is None:
+                # Sentinel — background thread is finished.
+                break
+
+            if skipped < history_count:
+                # This item was already replayed from job.logs — discard.
+                skipped += 1
+                continue
+
+            await send({"type": "log", "data": item})
+
+    except WebSocketDisconnect:
+        # Client closed the socket mid-stream — nothing to do.
+        return
+
+    # ------------------------------------------------------------------
+    # 4. Job finished while we were streaming.  Send final frames.
+    # ------------------------------------------------------------------
+    await send({"type": "status", "data": job.status.value})
+
+    if job.result:
+        await send({"type": "result", "data": job.result})
+    if job.error:
+        await send({"type": "error", "data": job.error})
+
+    await send({"type": "done"})
     await websocket.close()
