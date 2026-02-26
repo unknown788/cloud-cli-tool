@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deployment Dashboard</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f2f5;
+        }
+
+        .card {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            min-width: 500px;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin: 0;
+        }
+
+        .header .status {
+            color: #2c7a7b;
+            background-color: #e6fffa;
+            padding: 5px 15px;
+            border-radius: 9999px;
+            font-weight: bold;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 15px;
+        }
+
+        .details-grid dt {
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .details-grid dd {
+            font-family: monospace;
+            color: #1a202c;
+            background-color: #edf2f7;
+            padding: 5px 10px;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <div class="header">
+            <h1>🚀 Deployment Dashboard</h1>
+            <div class="status">Live & Online</div>
+        </div>
+        <dl class="details-grid">
+            <dt>Public IP Address</dt>
+            <dd>__IP_ADDRESS__</dd>
+
+            <dt>Virtual Machine Name</dt>
+            <dd>__VM_NAME__</dd>
+
+            <dt>Azure Region</dt>
+            <dd>__LOCATION__</dd>
+
+            <dt>Last Deployed On</dt>
+            <dd>__DEPLOY_TIME__</dd>
+        </dl>
+    </div>
+</body>
+
+</html>

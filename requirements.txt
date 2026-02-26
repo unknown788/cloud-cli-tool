@@ -1,0 +1,14 @@
+# CLI Framework
+typer
+
+# Azure SDK
+azure-identity
+azure-mgmt-resource
+azure-mgmt-network
+azure-mgmt-compute
+
+# SSH for remote execution
+paramiko
+
+# For managing environment variables (secrets)
+python-dotenv
