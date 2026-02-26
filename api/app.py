@@ -14,16 +14,17 @@ Endpoints:
   GET  /jobs/{job_id}            — full job detail (logs + status)
   WS   /ws/{job_id}              — live log streaming over WebSocket
 
+Abuse-protection (api/middleware.py):
+  - Per-IP token-bucket rate limiting (reads: RATE_LIMIT_READ_RPM/min,
+    writes: RATE_LIMIT_WRITE_RPM/min).
+  - API-key header guard on all mutating endpoints (X-API-Key header).
+  - Global + per-IP concurrency cap (MAX_CONCURRENT_JOBS / MAX_JOBS_PER_IP).
+  - CORS locked to ALLOWED_ORIGINS (comma-separated env var).
+
 Design decisions:
   - All mutations are async (background thread) and return 202 immediately.
-    This is critical: provisioning takes 3-5 minutes — a synchronous HTTP
-    handler would time out every reverse proxy and load balancer on the planet.
-  - The `log=` callable hook (established in Phase 1) is the bridge between
-    the synchronous provider code and the async WebSocket stream.
-  - State is read from / written to state.json on disk, same as the CLI.
-    This means the CLI and API are always in sync — no separate DB needed
-    for a single-user tool.
-  - CORS is open (*) for development. Tighten in production.
+  - The `log=` callable hook bridges sync provider code → async WebSocket.
+  - State lives in state.json — CLI and API always in sync, no DB needed.
 """
 
 import json
@@ -33,7 +34,7 @@ import functools
 from pathlib import Path
 from typing import List
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -51,6 +52,18 @@ from api.schemas import (
     PlanResource,
 )
 from api.jobs import job_store, launch_job
+from api.middleware import (
+    RateLimitMiddleware,
+    require_api_key,
+    check_concurrency,
+    check_provision_budget,
+    schedule_auto_destroy,
+    cancel_auto_destroy,
+    get_provision_quota,
+    get_key_usage,
+    write_audit,
+    _get_client_ip,
+)
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -61,19 +74,36 @@ app = FastAPI(
     description=(
         "REST + WebSocket API for the CloudLaunch Platform.\n\n"
         "Provision Azure VMs, deploy containerised apps, and stream "
-        "real-time logs — all over HTTP."
+        "real-time logs — all over HTTP.\n\n"
+        "**Mutating endpoints require the `X-API-Key` header.**"
     ),
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
 
+# ------------------------------------------------------------------
+# CORS — lock down to the domains you actually need.
+# Set ALLOWED_ORIGINS env var to a comma-separated list, e.g.:
+#   ALLOWED_ORIGINS=https://myportfolio.com,https://www.myportfolio.com
+# Falls back to "*" only when not set (local dev).
+# ------------------------------------------------------------------
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
+_allowed_origins = (
+    [o.strip() for o in _raw_origins.split(",") if o.strip()]
+    if _raw_origins != "*"
+    else ["*"]
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # tighten for production
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_allowed_origins,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "X-API-Key"],
 )
+
+# Per-IP token-bucket rate limiter (reads + writes tracked separately)
+app.add_middleware(RateLimitMiddleware)
 
 # Serve the web dashboard from the static/ directory.
 # Mount AFTER all API routes so /static/* doesn't shadow API paths.
@@ -129,6 +159,26 @@ def healthz():
 
 
 # ---------------------------------------------------------------------------
+# Quota  (public — no auth needed, shows visitors the remaining budget)
+# ---------------------------------------------------------------------------
+
+@app.get("/quota", tags=["Meta"], summary="Remaining provision budget and limits")
+def quota():
+    """
+    Returns the current abuse-protection counters so the dashboard can
+    display a live quota indicator to visitors:
+
+      - provisions_used / provisions_limit
+      - key_uses_used / key_uses_limit
+      - auto_destroy_minutes
+
+    This endpoint is intentionally unauthenticated so the dashboard can
+    show the quota *before* the user enters an API key.
+    """
+    return {**get_provision_quota(), **get_key_usage()}
+
+
+# ---------------------------------------------------------------------------
 # Plan  (zero cloud calls)
 # ---------------------------------------------------------------------------
 
@@ -180,8 +230,13 @@ def get_plan(
     status_code=202,
     tags=["Operations"],
     summary="Provision a complete VM stack (async)",
+    dependencies=[
+        Depends(require_api_key),
+        Depends(check_provision_budget),   # wallet guard — hard VM cap
+        Depends(check_concurrency),
+    ],
 )
-def provision(req: ProvisionRequest):
+def provision(req: ProvisionRequest, request: Request):
     """
     Kicks off VM provisioning in a background thread.
 
@@ -191,6 +246,9 @@ def provision(req: ProvisionRequest):
 
     On success the provisioned VM state (including public IP) is available
     in `GET /jobs/{job_id}` → `result` field.
+
+    **Requires X-API-Key header.**
+    After AUTO_DESTROY_MINUTES the VM is automatically torn down.
     """
     try:
         p = get_provider(req.provider)
@@ -205,14 +263,23 @@ def provision(req: ProvisionRequest):
         ssh_key_path=ssh_key_path,
         resource_group=req.resource_group,
     )
+    caller_ip = _get_client_ip(request)
+    write_audit("PROVISION", caller_ip, f"vm={req.vm_name} rg={req.resource_group}")
 
     def _provision_and_save(log=print):
-        """Thin wrapper: provision + persist state to disk."""
+        """Provision, persist state, then arm the auto-destroy timer."""
         state = p.provision(config, log=log)
         _save_state(state)
+        # Arm auto-destroy — if visitor forgets to destroy, we clean up for them
+        schedule_auto_destroy(
+            state=state,
+            provider_name=req.provider,
+            state_file=STATE_FILE,
+            log_fn=log,
+        )
         return state
 
-    job = launch_job("provision", _provision_and_save)
+    job = launch_job("provision", _provision_and_save, caller_ip=caller_ip)
     return _job_response(job)
 
 
@@ -226,11 +293,14 @@ def provision(req: ProvisionRequest):
     status_code=202,
     tags=["Operations"],
     summary="Deploy the containerised app to the provisioned VM (async)",
+    dependencies=[Depends(require_api_key), Depends(check_concurrency)],
 )
-def deploy(req: DeployRequest):
+def deploy(req: DeployRequest, request: Request):
     """
     Builds and runs the Docker container on the provisioned VM.
     Requires a prior successful POST /provision (reads state.json).
+
+    **Requires X-API-Key header.**
     """
     state = _load_state()
     try:
@@ -238,7 +308,9 @@ def deploy(req: DeployRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    job = launch_job("deploy", p.deploy, state)
+    caller_ip = _get_client_ip(request)
+    write_audit("DEPLOY", caller_ip)
+    job = launch_job("deploy", p.deploy, state, caller_ip=caller_ip)
     return _job_response(job)
 
 
@@ -252,13 +324,16 @@ def deploy(req: DeployRequest):
     status_code=202,
     tags=["Operations"],
     summary="Tear down all cloud resources (async)",
+    dependencies=[Depends(require_api_key), Depends(check_concurrency)],
 )
-def destroy(req: DestroyRequest):
+def destroy(req: DestroyRequest, request: Request):
     """
     Deletes the entire resource group and all cloud resources.
     Also removes state.json on success.
 
     ⚠ This is irreversible.
+
+    **Requires X-API-Key header.**
     """
     state = _load_state()
     try:
@@ -266,12 +341,18 @@ def destroy(req: DestroyRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    caller_ip = _get_client_ip(request)
+    write_audit("DESTROY", caller_ip)
+
     def _destroy_and_cleanup(log=print):
+        # Cancel any pending auto-destroy timer since we're doing it manually
+        if cancel_auto_destroy():
+            log("ℹ️  Auto-destroy timer cancelled (manual destroy in progress).")
         p.destroy(state, log=log)
         if os.path.exists(STATE_FILE):
             os.remove(STATE_FILE)
 
-    job = launch_job("destroy", _destroy_and_cleanup)
+    job = launch_job("destroy", _destroy_and_cleanup, caller_ip=caller_ip)
     return _job_response(job)
 
 

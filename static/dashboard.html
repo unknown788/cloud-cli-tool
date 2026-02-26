@@ -359,6 +359,14 @@
   <div class="logo">☁ Cloud<span>Launch</span></div>
   <div class="tagline">Provision · Deploy · Manage</div>
   <div class="spacer"></div>
+  <!-- Quota badge — shows remaining budget to visitors -->
+  <div id="quota-badge" title="Remaining provision quota" style="display:none;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;background:#3d2c00;color:#e3b341;margin-right:8px;cursor:default;">
+    ⚡ <span id="quota-text">? / ?</span> VMs
+  </div>
+  <!-- Auto-destroy countdown -->
+  <div id="ttl-badge" style="display:none;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;background:#3d0000;color:#f85149;margin-right:8px;cursor:default;">
+    ⏰ Auto-destroy: <span id="ttl-countdown">--:--</span>
+  </div>
   <div id="vm-status-badge" class="unknown">⬤ No VM</div>
 </header>
 
@@ -432,6 +440,18 @@
     <div class="card">
       <div class="card-header">⚙ Configuration</div>
       <div class="card-body">
+        <!-- API key row — full width, prominent -->
+        <div class="field" style="grid-column:1/-1;margin-bottom:4px;">
+          <label>🔑 API Key <span style="color:#f85149;font-weight:700">*</span>
+            <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0"> — required to run operations</span>
+          </label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="cfg-api-key" type="password" placeholder="Paste the key you received from the site owner"
+              style="flex:1" oninput="onApiKeyChange()" />
+            <button class="btn" onclick="toggleKeyVisibility()" id="btn-show-key" style="padding:8px 12px;font-size:12px;">👁</button>
+          </div>
+          <div id="key-status" style="font-size:11px;margin-top:4px;color:var(--muted)">Enter the API key above to enable operations.</div>
+        </div>
         <div class="form-grid">
           <div class="field">
             <label>Cloud Provider</label>
@@ -552,8 +572,12 @@
 'use strict';
 
 // ── Config ────────────────────────────────────────────────────────
-// API base is same origin when served by FastAPI, so no CORS headers needed.
-const API = '';   // empty string = same origin
+const API = '';   // same origin — FastAPI serves this file
+
+// ── State ─────────────────────────────────────────────────────────
+let _ttlDestroyAt  = null;   // Date when auto-destroy fires (from quota endpoint)
+let _ttlInterval   = null;   // setInterval handle for the countdown
+let _quotaData     = null;   // last fetched /quota response
 
 // ── Tab routing ───────────────────────────────────────────────────
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -571,12 +595,101 @@ document.getElementById('btn-goto-ops').addEventListener('click', () => {
   document.querySelector('[data-tab="ops"]').click();
 });
 
+// ── API key helpers ───────────────────────────────────────────────
+function apiKey() {
+  return document.getElementById('cfg-api-key').value.trim();
+}
+
+function toggleKeyVisibility() {
+  const inp = document.getElementById('cfg-api-key');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+function onApiKeyChange() {
+  const key = apiKey();
+  const status = document.getElementById('key-status');
+  if (!key) {
+    status.textContent = 'Enter the API key above to enable operations.';
+    status.style.color = 'var(--muted)';
+    setOpsEnabled(false);
+  } else {
+    status.textContent = '✓ Key entered — operations enabled.';
+    status.style.color = '#3fb950';
+    setOpsEnabled(true);
+  }
+}
+
+function setOpsEnabled(enabled) {
+  ['btn-provision','btn-deploy','btn-redeploy','btn-destroy'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !enabled;
+  });
+}
+
+// Disable op buttons until a key is entered
+setOpsEnabled(false);
+
+// ── Quota / budget display ────────────────────────────────────────
+async function loadQuota() {
+  try {
+    const q = await fetchJSON(`${API}/quota`);
+    _quotaData = q;
+
+    const badge = document.getElementById('quota-badge');
+    const text  = document.getElementById('quota-text');
+    if (q.provisions_limit !== null && q.provisions_limit !== undefined) {
+      const remaining = q.provisions_limit - q.provisions_used;
+      text.textContent = `${q.provisions_used} / ${q.provisions_limit}`;
+      badge.style.display = 'inline-block';
+      // Colour-code: green = plenty, amber = low, red = exhausted
+      if (remaining <= 0) {
+        badge.style.background = '#3d0000'; badge.style.color = '#f85149';
+        badge.title = 'Provision budget exhausted — no more VMs can be created.';
+      } else if (remaining === 1) {
+        badge.style.background = '#3d2c00'; badge.style.color = '#e3b341';
+        badge.title = `1 provision remaining.`;
+      } else {
+        badge.style.background = '#1a4731'; badge.style.color = '#3fb950';
+        badge.title = `${remaining} provision(s) remaining.`;
+      }
+    }
+  } catch (_) { /* quota display is best-effort */ }
+}
+
+// ── Auto-destroy countdown ────────────────────────────────────────
+function startTtlCountdown(destroyAt) {
+  _ttlDestroyAt = destroyAt;
+  if (_ttlInterval) clearInterval(_ttlInterval);
+  const badge     = document.getElementById('ttl-badge');
+  const countdown = document.getElementById('ttl-countdown');
+  badge.style.display = 'inline-block';
+
+  function tick() {
+    const diff = Math.max(0, Math.floor((_ttlDestroyAt - Date.now()) / 1000));
+    if (diff === 0) {
+      countdown.textContent = 'NOW';
+      clearInterval(_ttlInterval);
+      badge.style.display = 'none';
+      return;
+    }
+    const m = String(Math.floor(diff / 60)).padStart(2, '0');
+    const s = String(diff % 60).padStart(2, '0');
+    countdown.textContent = `${m}:${s}`;
+  }
+  tick();
+  _ttlInterval = setInterval(tick, 1000);
+}
+
+function stopTtlCountdown() {
+  if (_ttlInterval) clearInterval(_ttlInterval);
+  document.getElementById('ttl-badge').style.display = 'none';
+}
+
 // ── Plan ──────────────────────────────────────────────────────────
 async function loadPlan() {
-  const vm   = document.getElementById('cfg-vm-name')?.value   || 'cloudlaunch-vm';
-  const rg   = document.getElementById('cfg-rg')?.value        || 'cloudlaunch-rg';
-  const loc  = document.getElementById('cfg-location')?.value  || 'southeastasia';
-
+  const vm  = document.getElementById('cfg-vm-name')?.value   || 'cloudlaunch-vm';
+  const rg  = document.getElementById('cfg-rg')?.value        || 'cloudlaunch-rg';
+  const loc = document.getElementById('cfg-location')?.value  || 'southeastasia';
   const url = `${API}/plan?provider=azure&vm_name=${encodeURIComponent(vm)}&location=${encodeURIComponent(loc)}&resource_group=${encodeURIComponent(rg)}`;
   try {
     const data = await fetchJSON(url);
@@ -606,13 +719,14 @@ function renderPlan(data) {
 }
 
 document.getElementById('btn-refresh-plan').addEventListener('click', loadPlan);
-loadPlan();   // load on page startup
+loadPlan();
+loadQuota();   // load quota on startup
 
 // ── Terminal helpers ──────────────────────────────────────────────
 const terminal  = document.getElementById('terminal');
 const termDot   = document.getElementById('term-dot');
 const termLabel = document.getElementById('term-label');
-let   cursor;   // the blinking cursor element
+let   cursor;
 
 function termClear() {
   terminal.innerHTML = '';
@@ -622,7 +736,6 @@ function termClear() {
 }
 
 function termLine(text, cls = '') {
-  // Insert BEFORE the cursor
   const line = document.createElement('div');
   line.className = 'line ' + cls;
   line.textContent = text;
@@ -634,37 +747,37 @@ function termClassify(text) {
   if (text.startsWith('✅') || text.includes('ready') || text.includes('complete')) return 'ok';
   if (text.startsWith('❌') || text.toLowerCase().includes('error') || text.toLowerCase().includes('fail')) return 'err';
   if (text.startsWith('🎉')) return 'rocket';
+  if (text.startsWith('⏰') || text.startsWith('⚠️')) return 'err';
   if (text.startsWith('  $') || text.startsWith('    ')) return 'cmd';
-  if (text.startsWith('🔗') || text.startsWith('⚙') || text.startsWith('🔥') || text.startsWith('📋')) return 'info';
-  if (text.startsWith('⚠')) return 'err';
+  if (text.startsWith('🔗') || text.startsWith('⚙') || text.startsWith('🔥') || text.startsWith('📋') || text.startsWith('ℹ️')) return 'info';
   return '';
 }
 
 function setTermStatus(state) {
   termDot.className = 'dot ' + state;
-  const labels = {
-    running: 'Running…',
-    done:    'Completed ✓',
-    error:   'Failed ✗',
-    '':      'Idle — select an operation above',
-  };
+  const labels = { running: 'Running…', done: 'Completed ✓', error: 'Failed ✗', '': 'Idle — select an operation above' };
   termLabel.textContent = labels[state] ?? state;
 }
 
-termClear();  // initialise cursor
+termClear();
 
-// ── Generic fetch helper ──────────────────────────────────────────
+// ── Generic fetch helper (injects X-API-Key when key present) ─────
 async function fetchJSON(url, opts = {}) {
+  const key = apiKey();
+  if (key && !(opts.headers?.['X-API-Key'])) {
+    opts.headers = { ...(opts.headers || {}), 'X-API-Key': key };
+  }
   const res = await fetch(url, opts);
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`HTTP ${res.status}: ${body}`);
+    let detail = `HTTP ${res.status}`;
+    try { const b = await res.json(); detail = b.detail || detail; } catch (_) {}
+    throw new Error(detail);
   }
   return res.json();
 }
 
 // ── WebSocket streaming ───────────────────────────────────────────
-function streamJob(jobId) {
+function streamJob(jobId, onResult) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const host  = location.host || 'localhost:8000';
   const ws    = new WebSocket(`${proto}://${host}/ws/${jobId}`);
@@ -672,24 +785,33 @@ function streamJob(jobId) {
 
   ws.onmessage = (evt) => {
     const frame = JSON.parse(evt.data);
-
     switch (frame.type) {
       case 'log':
         termLine(frame.data, termClassify(frame.data));
         break;
       case 'status':
-        if (frame.data !== 'running') {
+        if (frame.data !== 'running')
           termLine(`── status: ${frame.data} ──`, frame.data === 'succeeded' ? 'ok' : 'err');
-        }
         break;
       case 'result':
         if (frame.data?.public_ip) {
           const ip = frame.data.public_ip;
-          termLine(`🎉 VM is live at http://${ip}`, 'rocket');
-          // Update the status badge in the header
+          // Clickable IP link in terminal
+          const link = document.createElement('div');
+          link.className = 'line rocket';
+          link.innerHTML = `🎉 VM is live at <a class="ip-link" href="http://${ip}" target="_blank" rel="noopener">http://${ip} ↗</a>`;
+          terminal.insertBefore(link, cursor || null);
+          terminal.scrollTop = terminal.scrollHeight;
           updateBadge('running');
           refreshStatus();
+          // Start TTL countdown if quota endpoint has auto_destroy_minutes
+          if (_quotaData?.auto_destroy_minutes) {
+            const destroyAt = Date.now() + _quotaData.auto_destroy_minutes * 60 * 1000;
+            startTtlCountdown(destroyAt);
+          }
+          loadQuota();   // refresh usage counters
         }
+        if (onResult) onResult(frame.data);
         break;
       case 'error':
         termLine(`❌ ${frame.data}`, 'err');
@@ -698,32 +820,25 @@ function streamJob(jobId) {
         termLine('· · ·', 'dim');
         break;
       case 'done':
-        if (!document.querySelector('#terminal .line.err')) {
-          setTermStatus('done');
-        } else {
-          setTermStatus('error');
-        }
-        loadJobs(); // refresh jobs tab silently
+        setTermStatus(document.querySelector('#terminal .line.err') ? 'error' : 'done');
+        loadJobs();
         ws.close();
         break;
     }
   };
 
-  ws.onerror = () => {
-    termLine('❌ WebSocket connection error', 'err');
-    setTermStatus('error');
-  };
-
+  ws.onerror = () => { termLine('❌ WebSocket connection error', 'err'); setTermStatus('error'); };
   ws.onclose = (evt) => {
-    if (evt.code === 4004) {
-      termLine(`❌ Job not found: ${jobId}`, 'err');
-      setTermStatus('error');
-    }
+    if (evt.code === 4004) { termLine(`❌ Job not found: ${jobId}`, 'err'); setTermStatus('error'); }
   };
 }
 
 // ── Launch operation ──────────────────────────────────────────────
-async function runOperation(endpoint, body = {}) {
+async function runOperation(endpoint, body = {}, onResult) {
+  if (!apiKey()) {
+    showToast('Enter your API key first.', 'error');
+    return;
+  }
   termClear();
   termLine(`▶  POST ${endpoint}`, 'dim');
   setTermStatus('running');
@@ -732,18 +847,20 @@ async function runOperation(endpoint, body = {}) {
   try {
     const job = await fetchJSON(`${API}${endpoint}`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     termLine(`   job_id: ${job.job_id}`, 'dim');
     termLine(`   status: ${job.status}`, 'dim');
     termLine('', '');
-    streamJob(job.job_id);
+    streamJob(job.job_id, onResult);
   } catch (e) {
     termLine(`❌ ${e.message}`, 'err');
     setTermStatus('error');
+    showToast(e.message, 'error');
   } finally {
     disableButtons(false);
+    if (apiKey()) setOpsEnabled(true);  // re-enable based on key presence
   }
 }
 
@@ -762,16 +879,12 @@ function getConfig() {
 document.getElementById('btn-provision').addEventListener('click', () => {
   runOperation('/provision', getConfig());
 });
-
 document.getElementById('btn-deploy').addEventListener('click', () => {
   runOperation('/deploy', { provider: getConfig().provider });
 });
-
 document.getElementById('btn-redeploy').addEventListener('click', () => {
   runOperation('/deploy', { provider: getConfig().provider });
 });
-
-// Destroy: show modal first
 document.getElementById('btn-destroy').addEventListener('click', () => {
   document.getElementById('destroy-modal').classList.add('open');
 });
@@ -780,13 +893,26 @@ document.getElementById('modal-cancel').addEventListener('click', () => {
 });
 document.getElementById('modal-confirm').addEventListener('click', () => {
   document.getElementById('destroy-modal').classList.remove('open');
-  runOperation('/destroy', { provider: getConfig().provider });
+  runOperation('/destroy', { provider: getConfig().provider }, () => stopTtlCountdown());
 });
 
 function disableButtons(disabled) {
   ['btn-provision','btn-deploy','btn-redeploy','btn-destroy'].forEach(id => {
     document.getElementById(id).disabled = disabled;
   });
+}
+
+// ── Toast notifications ────────────────────────────────────────────
+function showToast(msg, type = 'info') {
+  const t = document.createElement('div');
+  t.style.cssText = `position:fixed;bottom:24px;right:24px;z-index:200;padding:12px 18px;
+    border-radius:8px;font-size:13px;max-width:340px;word-break:break-word;
+    background:${type === 'error' ? '#3d0000' : '#1a4731'};
+    border:1px solid ${type === 'error' ? '#f85149' : '#3fb950'};
+    color:${type === 'error' ? '#f85149' : '#3fb950'};`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 5000);
 }
 
 // ── Status tab ─────────────────────────────────────────────────────
@@ -800,20 +926,22 @@ async function refreshStatus() {
     stateEl.textContent = s.state;
     stateEl.className   = 'stat-value ' + (s.state === 'running' ? 'green' : 'yellow');
 
-    document.getElementById('stat-ip').textContent       = s.public_ip ?? '—';
     document.getElementById('stat-size').textContent     = s.vm_size   ?? '—';
     document.getElementById('stat-location').textContent = s.location  ?? '—';
     document.getElementById('stat-disk').textContent     = s.os_disk_size_gb ? s.os_disk_size_gb + ' GB' : '—';
     document.getElementById('stat-name').textContent     = s.vm_name   ?? '—';
 
-    // Add clickable link for running VMs
+    // Clickable IP link
+    const ipEl = document.getElementById('stat-ip');
     if (s.state === 'running' && s.public_ip) {
-      const ipEl = document.getElementById('stat-ip');
       ipEl.innerHTML = `<a class="ip-link" href="http://${s.public_ip}" target="_blank" rel="noopener">${s.public_ip} ↗</a>`;
+    } else {
+      ipEl.textContent = s.public_ip ?? '—';
+      ipEl.className   = 'stat-value muted';
     }
 
     updateBadge(s.state);
-  } catch (e) {
+  } catch (_) {
     document.getElementById('status-note').style.display = 'block';
     document.getElementById('status-note').textContent   = 'No VM state found. Provision a VM first.';
     updateBadge('unknown');
@@ -823,19 +951,13 @@ async function refreshStatus() {
 function updateBadge(state) {
   const badge = document.getElementById('vm-status-badge');
   badge.className = state;
-  const labels = {
-    running:     '⬤ Running',
-    stopped:     '⬤ Stopped',
-    deallocated: '⬤ Deallocated',
-    unknown:     '⬤ No VM',
-  };
+  const labels = { running: '⬤ Running', stopped: '⬤ Stopped', deallocated: '⬤ Deallocated', unknown: '⬤ No VM' };
   badge.textContent = labels[state] ?? `⬤ ${state}`;
 }
 
 document.getElementById('btn-refresh-status').addEventListener('click', refreshStatus);
-// Auto-poll every 30 s
 setInterval(refreshStatus, 30000);
-refreshStatus();   // fetch on load
+refreshStatus();
 
 // ── Jobs tab ───────────────────────────────────────────────────────
 async function loadJobs() {
@@ -854,17 +976,12 @@ function renderJobs(jobs) {
     container.innerHTML = '<div class="empty-state">No jobs yet. Run an operation first.</div>';
     return;
   }
-
   container.innerHTML = jobs.map(j => {
     const pillClass = {
-      succeeded: 'pill-succeeded',
-      running:   'pill-running',
-      failed:    'pill-failed',
-      pending:   'pill-pending',
+      succeeded: 'pill-succeeded', running: 'pill-running',
+      failed: 'pill-failed', pending: 'pill-pending',
     }[j.status] || 'pill-pending';
-
     const logLines = (j.logs || []).join('\n') || '(no logs)';
-
     return `
       <div>
         <div class="job-row">
