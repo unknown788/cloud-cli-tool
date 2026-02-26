@@ -35,7 +35,8 @@ from typing import List
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from providers import get_provider, ProvisionConfig
 from api.schemas import (
@@ -74,7 +75,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Serve the web dashboard from the static/ directory.
+# Mount AFTER all API routes so /static/* doesn't shadow API paths.
+_static_dir = Path(__file__).parent.parent / "static"
+if _static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+
 STATE_FILE = "state.json"
+
+
+# ---------------------------------------------------------------------------
+# Root redirect → dashboard
+# ---------------------------------------------------------------------------
+
+@app.get("/", include_in_schema=False)
+def root():
+    """Redirect / → /static/dashboard.html for convenience."""
+    return RedirectResponse(url="/static/dashboard.html")
 
 
 # ---------------------------------------------------------------------------

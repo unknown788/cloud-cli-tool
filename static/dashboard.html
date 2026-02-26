@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CloudLaunch Platform</title>
+  <style>
+    /* ── Reset & tokens ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #0d1117;
+      --surface:  #161b22;
+      --border:   #30363d;
+      --text:     #e6edf3;
+      --muted:    #8b949e;
+      --accent:   #238636;
+      --accent-h: #2ea043;
+      --danger:   #da3633;
+      --danger-h: #f85149;
+      --warn:     #d29922;
+      --info:     #388bfd;
+      --radius:   8px;
+      --mono:     'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      height: 56px;
+      flex-shrink: 0;
+    }
+    header .logo { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    header .logo span { color: var(--accent-h); }
+    header .tagline { color: var(--muted); font-size: 12px; }
+    header .spacer { flex: 1; }
+    #vm-status-badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--border);
+      color: var(--muted);
+      cursor: default;
+      transition: all 0.3s;
+    }
+    #vm-status-badge.running  { background: #1a4731; color: #3fb950; }
+    #vm-status-badge.stopped  { background: #3d2c00; color: var(--warn); }
+    #vm-status-badge.unknown  { background: var(--border); color: var(--muted); }
+
+    /* ── Tab bar ─────────────────────────────────────────────────── */
+    .tab-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      padding: 0 24px;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .tab-btn {
+      padding: 12px 16px;
+      border: none;
+      background: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn:hover  { color: var(--text); }
+    .tab-btn.active { color: var(--text); border-bottom-color: var(--accent-h); }
+
+    /* ── Main layout ─────────────────────────────────────────────── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      gap: 20px;
+      max-width: 1100px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* ── Tab panels ──────────────────────────────────────────────── */
+    .tab-panel { display: none; flex-direction: column; gap: 16px; }
+    .tab-panel.active { display: flex; }
+
+    /* ── Action bar ──────────────────────────────────────────────── */
+    .action-bar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .btn {
+      padding: 8px 18px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:hover  { background: var(--border); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn.primary  { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn.primary:hover { background: var(--accent-h); }
+    .btn.danger   { background: var(--danger); border-color: var(--danger); color: #fff; }
+    .btn.danger:hover  { background: var(--danger-h); }
+    .btn.info     { background: #0d419d; border-color: var(--info); color: #fff; }
+    .btn.info:hover    { background: var(--info); }
+
+    /* ── Cards ───────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .card-body { padding: 16px; }
+
+    /* ── Terminal ────────────────────────────────────────────────── */
+    #terminal {
+      background: #010409;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: 12.5px;
+      line-height: 1.6;
+      padding: 16px;
+      height: 420px;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+    }
+    #terminal .line { white-space: pre-wrap; word-break: break-all; }
+    #terminal .line.ok     { color: #3fb950; }
+    #terminal .line.err    { color: #f85149; }
+    #terminal .line.money  { color: #79c0ff; }
+    #terminal .line.rocket { color: #e3b341; font-weight: 700; }
+    #terminal .line.dim    { color: #484f58; }
+    #terminal .line.cmd    { color: #8b949e; }
+    #terminal .line.info   { color: #58a6ff; }
+    #terminal .cursor      { display: inline-block; width: 8px; height: 14px;
+                              background: var(--text); animation: blink 1s step-end infinite;
+                              vertical-align: text-bottom; margin-left: 2px; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .terminal-status {
+      padding: 6px 12px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      background: #010409;
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+    .dot.running  { background: #3fb950; box-shadow: 0 0 6px #3fb95066; animation: pulse 1.5s infinite; }
+    .dot.done     { background: #3fb950; }
+    .dot.error    { background: #f85149; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+    /* ── Plan table ──────────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #1c2128; }
+    .type-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .type-compute  { background: #1a4731; color: #3fb950; }
+    .type-network  { background: #0d419d; color: #79c0ff; }
+    .type-security { background: #3d2c00; color: #e3b341; }
+    .type-container{ background: #2d1f3d; color: #bc8cff; }
+
+    /* ── Status grid ─────────────────────────────────────────────── */
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .stat-value { font-size: 18px; font-weight: 700; font-family: var(--mono); }
+    .stat-value.green { color: #3fb950; }
+    .stat-value.yellow{ color: #e3b341; }
+    .stat-value.muted { color: var(--muted); font-size: 14px; }
+
+    /* ── Jobs history ────────────────────────────────────────────── */
+    .job-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .job-row:last-child { border-bottom: none; }
+    .job-op { font-weight: 600; width: 90px; text-transform: capitalize; }
+    .job-id { font-family: var(--mono); font-size: 11px; color: var(--muted); flex: 1; }
+    .job-status-pill {
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .pill-succeeded{ background: #1a4731; color: #3fb950; }
+    .pill-running  { background: #0d419d; color: #79c0ff; }
+    .pill-failed   { background: #3d0000; color: #f85149; }
+    .pill-pending  { background: var(--border); color: var(--muted); }
+    .job-logs-btn { padding: 3px 10px; font-size: 11px; cursor: pointer; }
+
+    /* ── Inline log viewer ───────────────────────────────────────── */
+    .job-logs-detail {
+      display: none;
+      background: #010409;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      color: #8b949e;
+      padding: 10px 16px;
+      max-height: 180px;
+      overflow-y: auto;
+      border-top: 1px solid var(--border);
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .job-logs-detail.open { display: block; }
+
+    /* ── Config form ─────────────────────────────────────────────── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
+    .field label {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .field input, .field select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input:focus, .field select:focus { border-color: var(--info); }
+
+    /* ── Modal ───────────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      max-width: 420px;
+      width: 90%;
+    }
+    .modal h3 { margin-bottom: 12px; }
+    .modal p  { color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 20px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+    /* ── Cost estimate box ───────────────────────────────────────── */
+    .cost-box {
+      background: #1a1f28;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      display: flex;
+      gap: 32px;
+      flex-wrap: wrap;
+    }
+    .cost-item { display: flex; flex-direction: column; gap: 2px; }
+    .cost-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .cost-value { font-size: 22px; font-weight: 700; font-family: var(--mono); color: #e3b341; }
+    .cost-sub   { font-size: 11px; color: var(--muted); }
+
+    /* ── Utility ─────────────────────────────────────────────────── */
+    .empty-state { color: var(--muted); text-align: center; padding: 32px; font-size: 13px; }
+    .ip-link { color: var(--info); text-decoration: none; font-family: var(--mono); }
+    .ip-link:hover { text-decoration: underline; }
+    .section-title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════ HEADER ═══════════════════════════════ -->
+<header>
+  <div class="logo">☁ Cloud<span>Launch</span></div>
+  <div class="tagline">Provision · Deploy · Manage</div>
+  <div class="spacer"></div>
+  <div id="vm-status-badge" class="unknown">⬤ No VM</div>
+</header>
+
+<!-- ═══════════════════════ TAB BAR ══════════════════════════════ -->
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="plan">📋 Plan</button>
+  <button class="tab-btn"        data-tab="ops">⚡ Operations</button>
+  <button class="tab-btn"        data-tab="status">📊 Status</button>
+  <button class="tab-btn"        data-tab="jobs">📜 Job History</button>
+</div>
+
+<!-- ═══════════════════════ MAIN ══════════════════════════════════ -->
+<main>
+
+  <!-- ─────────────────── TAB: PLAN ─────────────────────────────── -->
+  <div class="tab-panel active" id="tab-plan">
+
+    <div class="action-bar">
+      <div class="section-title">Resource preview</div>
+      <div class="spacer" style="flex:1"></div>
+      <button class="btn" id="btn-refresh-plan">↺ Refresh</button>
+      <button class="btn primary" id="btn-goto-ops">⚡ Provision →</button>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🗂 Resources that will be created</div>
+      <table id="plan-table">
+        <thead>
+          <tr>
+            <th>Resource</th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody id="plan-tbody">
+          <tr><td colspan="4" class="empty-state">Loading plan…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="cost-box" id="cost-box">
+      <div class="cost-item">
+        <div class="cost-label">Hourly</div>
+        <div class="cost-value">$0.010</div>
+        <div class="cost-sub">Standard_B1s</div>
+      </div>
+      <div class="cost-item">
+        <div class="cost-label">Monthly est.</div>
+        <div class="cost-value">$7.49</div>
+        <div class="cost-sub">730 hrs / month</div>
+      </div>
+      <div class="cost-item">
+        <div class="cost-label">VM Size</div>
+        <div class="cost-value" id="cost-vm-size" style="font-size:16px;margin-top:4px">Standard_B1s</div>
+        <div class="cost-sub">1 vCPU · 1 GB RAM</div>
+      </div>
+      <div class="cost-item">
+        <div class="cost-label">Region</div>
+        <div class="cost-value" id="cost-region" style="font-size:16px;margin-top:4px">southeastasia</div>
+        <div class="cost-sub">Southeast Asia</div>
+      </div>
+    </div>
+
+  </div><!-- /tab-plan -->
+
+  <!-- ─────────────────── TAB: OPERATIONS ───────────────────────── -->
+  <div class="tab-panel" id="tab-ops">
+
+    <!-- Config form -->
+    <div class="card">
+      <div class="card-header">⚙ Configuration</div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="field">
+            <label>Cloud Provider</label>
+            <select id="cfg-provider">
+              <option value="azure">Azure</option>
+              <option value="aws" disabled>AWS (coming soon)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>VM Name</label>
+            <input id="cfg-vm-name" value="cloudlaunch-vm" />
+          </div>
+          <div class="field">
+            <label>Resource Group</label>
+            <input id="cfg-rg" value="cloudlaunch-rg" />
+          </div>
+          <div class="field">
+            <label>Region</label>
+            <input id="cfg-location" value="southeastasia" />
+          </div>
+          <div class="field">
+            <label>Admin Username</label>
+            <input id="cfg-username" value="azureuser" />
+          </div>
+          <div class="field">
+            <label>SSH Public Key Path</label>
+            <input id="cfg-ssh-key" value="~/.ssh/id_rsa.pub" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="action-bar">
+      <button class="btn primary" id="btn-provision">🚀 Provision VM</button>
+      <button class="btn info"    id="btn-deploy">📦 Deploy App</button>
+      <button class="btn info"    id="btn-redeploy">🔄 Redeploy App</button>
+      <button class="btn danger"  id="btn-destroy">💀 Destroy</button>
+    </div>
+
+    <!-- Terminal -->
+    <div id="terminal"><span class="cursor"></span></div>
+    <div class="terminal-status">
+      <div class="dot" id="term-dot"></div>
+      <span id="term-label">Idle — select an operation above</span>
+    </div>
+
+  </div><!-- /tab-ops -->
+
+  <!-- ─────────────────── TAB: STATUS ───────────────────────────── -->
+  <div class="tab-panel" id="tab-status">
+    <div class="action-bar">
+      <div class="section-title">Live VM status</div>
+      <div class="spacer" style="flex:1"></div>
+      <button class="btn" id="btn-refresh-status">↺ Refresh now</button>
+    </div>
+    <div class="status-grid" id="status-grid">
+      <div class="stat-card">
+        <div class="stat-label">Power State</div>
+        <div class="stat-value muted" id="stat-state">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Public IP</div>
+        <div class="stat-value muted" id="stat-ip">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">VM Size</div>
+        <div class="stat-value muted" id="stat-size">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Location</div>
+        <div class="stat-value muted" id="stat-location">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">OS Disk</div>
+        <div class="stat-value muted" id="stat-disk">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">VM Name</div>
+        <div class="stat-value muted" id="stat-name">—</div>
+      </div>
+    </div>
+    <div id="status-note" class="empty-state">Provision a VM first, then refresh.</div>
+  </div><!-- /tab-status -->
+
+  <!-- ─────────────────── TAB: JOBS ─────────────────────────────── -->
+  <div class="tab-panel" id="tab-jobs">
+    <div class="action-bar">
+      <div class="section-title">All operations</div>
+      <div class="spacer" style="flex:1"></div>
+      <button class="btn" id="btn-refresh-jobs">↺ Refresh</button>
+    </div>
+    <div class="card" id="jobs-container">
+      <div class="empty-state">No jobs yet. Run an operation first.</div>
+    </div>
+  </div><!-- /tab-jobs -->
+
+</main><!-- /main -->
+
+<!-- ═══════════════════════ DESTROY MODAL ════════════════════════ -->
+<div class="modal-overlay" id="destroy-modal">
+  <div class="modal">
+    <h3>💀 Confirm Destroy</h3>
+    <p>
+      This will permanently delete the entire resource group and
+      <strong>all</strong> cloud resources inside it. This action
+      cannot be undone.
+    </p>
+    <div class="modal-actions">
+      <button class="btn" id="modal-cancel">Cancel</button>
+      <button class="btn danger" id="modal-confirm">Yes, destroy everything</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ SCRIPT ═══════════════════════════════ -->
+<script>
+'use strict';
+
+// ── Config ────────────────────────────────────────────────────────
+// API base is same origin when served by FastAPI, so no CORS headers needed.
+const API = '';   // empty string = same origin
+
+// ── Tab routing ───────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'jobs')   loadJobs();
+    if (btn.dataset.tab === 'status') refreshStatus();
+  });
+});
+
+document.getElementById('btn-goto-ops').addEventListener('click', () => {
+  document.querySelector('[data-tab="ops"]').click();
+});
+
+// ── Plan ──────────────────────────────────────────────────────────
+async function loadPlan() {
+  const vm   = document.getElementById('cfg-vm-name')?.value   || 'cloudlaunch-vm';
+  const rg   = document.getElementById('cfg-rg')?.value        || 'cloudlaunch-rg';
+  const loc  = document.getElementById('cfg-location')?.value  || 'southeastasia';
+
+  const url = `${API}/plan?provider=azure&vm_name=${encodeURIComponent(vm)}&location=${encodeURIComponent(loc)}&resource_group=${encodeURIComponent(rg)}`;
+  try {
+    const data = await fetchJSON(url);
+    renderPlan(data);
+  } catch (e) {
+    document.getElementById('plan-tbody').innerHTML =
+      `<tr><td colspan="4" class="empty-state" style="color:#f85149">Failed to load plan: ${e.message}</td></tr>`;
+  }
+}
+
+function renderPlan(data) {
+  const typeColors = {
+    compute: 'type-compute', network: 'type-network',
+    security: 'type-security', container: 'type-container',
+  };
+  const tbody = document.getElementById('plan-tbody');
+  tbody.innerHTML = data.resources.map(r => `
+    <tr>
+      <td>+ ${r.resource}</td>
+      <td><code style="font-family:var(--mono);font-size:12px">${r.name}</code></td>
+      <td><span class="type-badge ${typeColors[r.type] || ''}">${r.type}</span></td>
+      <td style="color:var(--muted)">${r.detail}</td>
+    </tr>
+  `).join('');
+  document.getElementById('cost-region').textContent  = data.location;
+  document.getElementById('cost-vm-size').textContent = data.vm_size;
+}
+
+document.getElementById('btn-refresh-plan').addEventListener('click', loadPlan);
+loadPlan();   // load on page startup
+
+// ── Terminal helpers ──────────────────────────────────────────────
+const terminal  = document.getElementById('terminal');
+const termDot   = document.getElementById('term-dot');
+const termLabel = document.getElementById('term-label');
+let   cursor;   // the blinking cursor element
+
+function termClear() {
+  terminal.innerHTML = '';
+  cursor = document.createElement('span');
+  cursor.className = 'cursor';
+  terminal.appendChild(cursor);
+}
+
+function termLine(text, cls = '') {
+  // Insert BEFORE the cursor
+  const line = document.createElement('div');
+  line.className = 'line ' + cls;
+  line.textContent = text;
+  terminal.insertBefore(line, cursor || null);
+  terminal.scrollTop = terminal.scrollHeight;
+}
+
+function termClassify(text) {
+  if (text.startsWith('✅') || text.includes('ready') || text.includes('complete')) return 'ok';
+  if (text.startsWith('❌') || text.toLowerCase().includes('error') || text.toLowerCase().includes('fail')) return 'err';
+  if (text.startsWith('🎉')) return 'rocket';
+  if (text.startsWith('  $') || text.startsWith('    ')) return 'cmd';
+  if (text.startsWith('🔗') || text.startsWith('⚙') || text.startsWith('🔥') || text.startsWith('📋')) return 'info';
+  if (text.startsWith('⚠')) return 'err';
+  return '';
+}
+
+function setTermStatus(state) {
+  termDot.className = 'dot ' + state;
+  const labels = {
+    running: 'Running…',
+    done:    'Completed ✓',
+    error:   'Failed ✗',
+    '':      'Idle — select an operation above',
+  };
+  termLabel.textContent = labels[state] ?? state;
+}
+
+termClear();  // initialise cursor
+
+// ── Generic fetch helper ──────────────────────────────────────────
+async function fetchJSON(url, opts = {}) {
+  const res = await fetch(url, opts);
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`HTTP ${res.status}: ${body}`);
+  }
+  return res.json();
+}
+
+// ── WebSocket streaming ───────────────────────────────────────────
+function streamJob(jobId) {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const host  = location.host || 'localhost:8000';
+  const ws    = new WebSocket(`${proto}://${host}/ws/${jobId}`);
+  setTermStatus('running');
+
+  ws.onmessage = (evt) => {
+    const frame = JSON.parse(evt.data);
+
+    switch (frame.type) {
+      case 'log':
+        termLine(frame.data, termClassify(frame.data));
+        break;
+      case 'status':
+        if (frame.data !== 'running') {
+          termLine(`── status: ${frame.data} ──`, frame.data === 'succeeded' ? 'ok' : 'err');
+        }
+        break;
+      case 'result':
+        if (frame.data?.public_ip) {
+          const ip = frame.data.public_ip;
+          termLine(`🎉 VM is live at http://${ip}`, 'rocket');
+          // Update the status badge in the header
+          updateBadge('running');
+          refreshStatus();
+        }
+        break;
+      case 'error':
+        termLine(`❌ ${frame.data}`, 'err');
+        break;
+      case 'ping':
+        termLine('· · ·', 'dim');
+        break;
+      case 'done':
+        if (!document.querySelector('#terminal .line.err')) {
+          setTermStatus('done');
+        } else {
+          setTermStatus('error');
+        }
+        loadJobs(); // refresh jobs tab silently
+        ws.close();
+        break;
+    }
+  };
+
+  ws.onerror = () => {
+    termLine('❌ WebSocket connection error', 'err');
+    setTermStatus('error');
+  };
+
+  ws.onclose = (evt) => {
+    if (evt.code === 4004) {
+      termLine(`❌ Job not found: ${jobId}`, 'err');
+      setTermStatus('error');
+    }
+  };
+}
+
+// ── Launch operation ──────────────────────────────────────────────
+async function runOperation(endpoint, body = {}) {
+  termClear();
+  termLine(`▶  POST ${endpoint}`, 'dim');
+  setTermStatus('running');
+  disableButtons(true);
+
+  try {
+    const job = await fetchJSON(`${API}${endpoint}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    termLine(`   job_id: ${job.job_id}`, 'dim');
+    termLine(`   status: ${job.status}`, 'dim');
+    termLine('', '');
+    streamJob(job.job_id);
+  } catch (e) {
+    termLine(`❌ ${e.message}`, 'err');
+    setTermStatus('error');
+  } finally {
+    disableButtons(false);
+  }
+}
+
+function getConfig() {
+  return {
+    provider:       document.getElementById('cfg-provider').value,
+    vm_name:        document.getElementById('cfg-vm-name').value,
+    resource_group: document.getElementById('cfg-rg').value,
+    location:       document.getElementById('cfg-location').value,
+    admin_username: document.getElementById('cfg-username').value,
+    ssh_key_path:   document.getElementById('cfg-ssh-key').value,
+  };
+}
+
+// ── Button wiring ──────────────────────────────────────────────────
+document.getElementById('btn-provision').addEventListener('click', () => {
+  runOperation('/provision', getConfig());
+});
+
+document.getElementById('btn-deploy').addEventListener('click', () => {
+  runOperation('/deploy', { provider: getConfig().provider });
+});
+
+document.getElementById('btn-redeploy').addEventListener('click', () => {
+  runOperation('/deploy', { provider: getConfig().provider });
+});
+
+// Destroy: show modal first
+document.getElementById('btn-destroy').addEventListener('click', () => {
+  document.getElementById('destroy-modal').classList.add('open');
+});
+document.getElementById('modal-cancel').addEventListener('click', () => {
+  document.getElementById('destroy-modal').classList.remove('open');
+});
+document.getElementById('modal-confirm').addEventListener('click', () => {
+  document.getElementById('destroy-modal').classList.remove('open');
+  runOperation('/destroy', { provider: getConfig().provider });
+});
+
+function disableButtons(disabled) {
+  ['btn-provision','btn-deploy','btn-redeploy','btn-destroy'].forEach(id => {
+    document.getElementById(id).disabled = disabled;
+  });
+}
+
+// ── Status tab ─────────────────────────────────────────────────────
+async function refreshStatus() {
+  const provider = document.getElementById('cfg-provider')?.value || 'azure';
+  try {
+    const s = await fetchJSON(`${API}/status?provider=${provider}`);
+    document.getElementById('status-note').style.display = 'none';
+
+    const stateEl = document.getElementById('stat-state');
+    stateEl.textContent = s.state;
+    stateEl.className   = 'stat-value ' + (s.state === 'running' ? 'green' : 'yellow');
+
+    document.getElementById('stat-ip').textContent       = s.public_ip ?? '—';
+    document.getElementById('stat-size').textContent     = s.vm_size   ?? '—';
+    document.getElementById('stat-location').textContent = s.location  ?? '—';
+    document.getElementById('stat-disk').textContent     = s.os_disk_size_gb ? s.os_disk_size_gb + ' GB' : '—';
+    document.getElementById('stat-name').textContent     = s.vm_name   ?? '—';
+
+    // Add clickable link for running VMs
+    if (s.state === 'running' && s.public_ip) {
+      const ipEl = document.getElementById('stat-ip');
+      ipEl.innerHTML = `<a class="ip-link" href="http://${s.public_ip}" target="_blank" rel="noopener">${s.public_ip} ↗</a>`;
+    }
+
+    updateBadge(s.state);
+  } catch (e) {
+    document.getElementById('status-note').style.display = 'block';
+    document.getElementById('status-note').textContent   = 'No VM state found. Provision a VM first.';
+    updateBadge('unknown');
+  }
+}
+
+function updateBadge(state) {
+  const badge = document.getElementById('vm-status-badge');
+  badge.className = state;
+  const labels = {
+    running:     '⬤ Running',
+    stopped:     '⬤ Stopped',
+    deallocated: '⬤ Deallocated',
+    unknown:     '⬤ No VM',
+  };
+  badge.textContent = labels[state] ?? `⬤ ${state}`;
+}
+
+document.getElementById('btn-refresh-status').addEventListener('click', refreshStatus);
+// Auto-poll every 30 s
+setInterval(refreshStatus, 30000);
+refreshStatus();   // fetch on load
+
+// ── Jobs tab ───────────────────────────────────────────────────────
+async function loadJobs() {
+  try {
+    const jobs = await fetchJSON(`${API}/jobs`);
+    renderJobs(jobs);
+  } catch (e) {
+    document.getElementById('jobs-container').innerHTML =
+      `<div class="empty-state" style="color:#f85149">Failed to load jobs: ${e.message}</div>`;
+  }
+}
+
+function renderJobs(jobs) {
+  const container = document.getElementById('jobs-container');
+  if (!jobs.length) {
+    container.innerHTML = '<div class="empty-state">No jobs yet. Run an operation first.</div>';
+    return;
+  }
+
+  container.innerHTML = jobs.map(j => {
+    const pillClass = {
+      succeeded: 'pill-succeeded',
+      running:   'pill-running',
+      failed:    'pill-failed',
+      pending:   'pill-pending',
+    }[j.status] || 'pill-pending';
+
+    const logLines = (j.logs || []).join('\n') || '(no logs)';
+
+    return `
+      <div>
+        <div class="job-row">
+          <div class="job-op">${j.operation || 'operation'}</div>
+          <div class="job-id">${j.job_id}</div>
+          <div class="job-status-pill ${pillClass}">${j.status}</div>
+          <button class="btn job-logs-btn" onclick="toggleLogs('${j.job_id}')">logs</button>
+        </div>
+        <div class="job-logs-detail" id="logs-${j.job_id}">${escapeHtml(logLines)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleLogs(jobId) {
+  document.getElementById('logs-' + jobId).classList.toggle('open');
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.getElementById('btn-refresh-jobs').addEventListener('click', loadJobs);
+</script>
+
+</body>
+</html>
