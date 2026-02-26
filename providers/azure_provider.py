@@ -348,6 +348,77 @@ class AzureProvider(CloudProvider):
             raise RuntimeError(f"Failed to get VM status: {ex.message}") from ex
 
     # ------------------------------------------------------------------
+    # logs
+    # ------------------------------------------------------------------
+
+    def logs(self, state: dict, follow: bool = False, log=print) -> None:
+        """
+        SSH into the VM and stream Docker container logs.
+
+        Uses an interactive channel (not exec_command) so that:
+          - Output is streamed line-by-line as it arrives, not buffered.
+          - Ctrl-C on the CLI side cleanly closes the channel.
+
+        Args:
+            state:  State dict from provision().
+            follow: True  → `docker logs -f` (tail -f, streams forever).
+                    False → `docker logs --tail 100` (last 100 lines, then exit).
+            log:    Callable — same log= pattern used throughout the codebase.
+        """
+        ip_address = state["public_ip"]
+        username = state["admin_username"]
+        private_key_path = str(Path.home() / ".ssh" / "id_rsa")
+
+        flag = "-f" if follow else "--tail 200"
+        cmd = f"sudo docker logs {flag} {DOCKER_CONTAINER_NAME} 2>&1"
+
+        try:
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(ip_address, username=username, key_filename=private_key_path)
+            log(f"🔗 Connected to {username}@{ip_address}")
+
+            if follow:
+                log(f"📋 Streaming live logs (Ctrl-C to stop)...")
+            else:
+                log(f"📋 Last 200 lines of container logs:")
+
+            # Use get_transport().open_session() for real-time streaming.
+            # exec_command() reads all output after the command finishes —
+            # useless for `docker logs -f`.
+            transport = ssh.get_transport()
+            channel = transport.open_session()
+            channel.set_combine_stderr(True)   # merge stderr into stdout stream
+            channel.exec_command(cmd)
+
+            # Read line-by-line until the remote command exits or channel closes.
+            buffer = b""
+            try:
+                while True:
+                    # recv() blocks until data arrives or channel closes
+                    chunk = channel.recv(4096)
+                    if not chunk:
+                        break
+                    buffer += chunk
+                    # Flush complete lines so the UI updates in real time
+                    while b"\n" in buffer:
+                        line, buffer = buffer.split(b"\n", 1)
+                        log(line.decode("utf-8", errors="replace"))
+            except KeyboardInterrupt:
+                # Ctrl-C: cleanly close the remote side before re-raising
+                channel.close()
+                log("\n⏹  Log stream stopped.")
+
+            if buffer:
+                log(buffer.decode("utf-8", errors="replace"))
+
+            channel.close()
+            ssh.close()
+
+        except Exception as ex:
+            raise RuntimeError(f"Failed to fetch logs: {ex}") from ex
+
+    # ------------------------------------------------------------------
     # private helpers
     # ------------------------------------------------------------------
 

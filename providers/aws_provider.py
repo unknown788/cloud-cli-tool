@@ -81,3 +81,11 @@ class AWSProvider(CloudProvider):
         to the normalised VMStatus.state field.
         """
         raise NotImplementedError("AWS provider is not yet implemented.")
+
+    def logs(self, state: dict, follow: bool = False, log=print) -> None:
+        """
+        AWS equivalent: SSH into EC2 instance and tail Docker container logs.
+        Implementation would be identical to AzureProvider.logs() since
+        it's pure SSH — no cloud-specific API calls needed.
+        """
+        raise NotImplementedError("AWS provider is not yet implemented.")

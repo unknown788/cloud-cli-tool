@@ -87,6 +87,19 @@ class CloudProvider(ABC):
         """
         ...
 
+    @abstractmethod
+    def logs(self, state: dict, follow: bool = False, log=print) -> None:
+        """
+        Stream Docker container logs from the VM.
+
+        Args:
+            state:  State dict from provision().
+            follow: If True, tail -f style (stream until Ctrl-C).
+                    If False, dump the last N lines and return.
+            log:    Callable for output. Same pattern as provision/deploy.
+        """
+        ...
+
     def get_plan(self, config: ProvisionConfig) -> List[Dict]:
         """
         Returns a list of resources that WOULD be created by provision().

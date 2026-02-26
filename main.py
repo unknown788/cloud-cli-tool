@@ -1,5 +1,6 @@
 import os
 import json
+import subprocess
 from typing import Optional
 
 import typer
@@ -150,6 +151,93 @@ def status(
         p = get_provider(provider)
         vm_status = p.get_status(state)
         print_status_panel(vm_status)
+    except (RuntimeError, EnvironmentError, ValueError) as e:
+        print_error(str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def logs(
+    provider: str  = typer.Option("azure",  help="Cloud provider: azure | aws"),
+    follow:   bool = typer.Option(False, "--follow", "-f", help="Stream logs continuously (tail -f style)."),
+):
+    """Stream Docker container logs from the running VM."""
+    state = load_state()
+    if not state:
+        print_error("No state found. Run 'provision' then 'deploy' first.")
+        raise typer.Exit(code=1)
+
+    print_banner()
+    try:
+        p = get_provider(provider)
+        p.logs(state, follow=follow, log=make_log_handler())
+    except KeyboardInterrupt:
+        # Ctrl-C during `--follow` is normal user behaviour — not an error.
+        pass
+    except (RuntimeError, EnvironmentError, ValueError) as e:
+        print_error(str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def ssh(
+    provider: str = typer.Option("azure", help="Cloud provider: azure | aws"),
+):
+    """Open an interactive SSH session directly to the VM."""
+    state = load_state()
+    if not state:
+        print_error("No state found. Run 'provision' first.")
+        raise typer.Exit(code=1)
+
+    ip       = state.get("public_ip")
+    username = state.get("admin_username", "azureuser")
+
+    if not ip:
+        print_error("No public IP in state. Reprovisioning may be required.")
+        raise typer.Exit(code=1)
+
+    key_path = str(Path.home() / ".ssh" / "id_rsa")
+    print_banner()
+    typer.secho(f"\n  Connecting → {username}@{ip}", fg=typer.colors.CYAN, bold=True)
+    typer.secho(f"  Key: {key_path}", fg=typer.colors.BRIGHT_BLACK)
+    typer.echo("")
+
+    # os.execvp() *replaces* this process with SSH — stdin/stdout/stderr are
+    # all inherited so the terminal is fully interactive. No subprocess overhead.
+    ssh_args = [
+        "ssh",
+        "-o", "StrictHostKeyChecking=no",
+        "-i", key_path,
+        f"{username}@{ip}",
+    ]
+    os.execvp("ssh", ssh_args)
+
+
+@app.command()
+def redeploy(
+    provider: str = typer.Option("azure", help="Cloud provider: azure | aws"),
+):
+    """Re-deploy the app to the existing VM without re-provisioning.
+
+    Use this after changing your application code. Skips the expensive
+    VM-creation steps and goes straight to Docker build + run.
+    """
+    state = load_state()
+    if not state:
+        print_error("No state found. Run 'provision' first.")
+        raise typer.Exit(code=1)
+
+    print_banner()
+    ip = state.get("public_ip", "unknown")
+    typer.secho(f"\n  Re-deploying to existing VM at {ip}...\n", fg=typer.colors.CYAN)
+
+    try:
+        p = get_provider(provider)
+        p.deploy(state, log=make_log_handler())
+        print_success(
+            f"Re-deployment complete!\n"
+            f"  ➜  http://{ip}"
+        )
     except (RuntimeError, EnvironmentError, ValueError) as e:
         print_error(str(e))
         raise typer.Exit(code=1)
