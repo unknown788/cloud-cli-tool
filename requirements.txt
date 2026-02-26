@@ -1,6 +1,9 @@
 # CLI Framework
 typer
 
+# Beautiful terminal output (tables, progress bars, color)
+rich
+
 # Azure SDK
 azure-identity
 azure-mgmt-resource
