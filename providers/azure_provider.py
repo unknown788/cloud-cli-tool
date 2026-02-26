@@ -32,9 +32,28 @@ class AzureProvider(CloudProvider):
     """
     Azure implementation of CloudProvider.
     Authenticates via DefaultAzureCredential (env vars, managed identity, CLI login).
+
+    Credential initialisation is lazy — the SDK clients are only created when
+    a cloud operation is actually invoked. This allows plan/introspection
+    operations to work without AZURE_SUBSCRIPTION_ID being set.
     """
 
     def __init__(self):
+        # Lazy init — don't touch credentials until a cloud call is needed.
+        # See _ensure_clients() below.
+        self._resource_client = None
+        self._network_client  = None
+        self._compute_client  = None
+
+    def _ensure_clients(self) -> None:
+        """
+        Initialise Azure SDK clients on first use.
+        Raises EnvironmentError if AZURE_SUBSCRIPTION_ID is not set.
+        Called at the top of every method that makes an Azure API call.
+        """
+        if self._resource_client is not None:
+            return   # already initialised
+
         subscription_id = os.environ.get("AZURE_SUBSCRIPTION_ID")
         if not subscription_id:
             raise EnvironmentError(
@@ -42,8 +61,8 @@ class AzureProvider(CloudProvider):
             )
         credential = DefaultAzureCredential()
         self._resource_client = ResourceManagementClient(credential, subscription_id)
-        self._network_client = NetworkManagementClient(credential, subscription_id)
-        self._compute_client = ComputeManagementClient(credential, subscription_id)
+        self._network_client  = NetworkManagementClient(credential, subscription_id)
+        self._compute_client  = ComputeManagementClient(credential, subscription_id)
 
     # ------------------------------------------------------------------
     # provision
@@ -66,6 +85,7 @@ class AzureProvider(CloudProvider):
         loc = config.location
 
         try:
+            self._ensure_clients()
             # 1. Resource Group
             rg_result = self._resource_client.resource_groups.create_or_update(
                 rg, {"location": loc}
@@ -226,6 +246,7 @@ class AzureProvider(CloudProvider):
         private_key_path = str(Path.home() / ".ssh" / "id_rsa")
 
         # Generate dynamic HTML from template
+        self._ensure_clients()
         log("⚙️  Generating dynamic deployment dashboard...")
         with open(f"{APP_DIR_NAME}/index.template.html", "r") as f:
             template = f.read()
@@ -299,6 +320,7 @@ class AzureProvider(CloudProvider):
         """
         rg = state["resource_group"]
         try:
+            self._ensure_clients()
             log(f"🔥 Deleting resource group '{rg}'... (this takes 1-3 minutes)")
             poller = self._resource_client.resource_groups.begin_delete(rg)
             poller.result()  # Block until fully deleted
@@ -319,6 +341,7 @@ class AzureProvider(CloudProvider):
         vm_name = state["vm_name"]
 
         try:
+            self._ensure_clients()
             vm = self._compute_client.virtual_machines.get(
                 rg, vm_name, expand="instanceView"
             )

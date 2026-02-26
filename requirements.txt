@@ -15,3 +15,7 @@ paramiko
 
 # For managing environment variables (secrets)
 python-dotenv
+
+# REST API + WebSocket server
+fastapi
+uvicorn[standard]
