@@ -380,7 +380,11 @@ def get_status(provider: str = "azure"):
     try:
         vm_status = p.get_status(state)
     except RuntimeError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        err = str(e)
+        # Treat "VM not found" as 404 (no VM provisioned yet) not 502
+        if "ResourceNotFound" in err or "not found" in err.lower():
+            raise HTTPException(status_code=404, detail="No VM found — provision one first.")
+        raise HTTPException(status_code=502, detail=err)
 
     return VMStatusResponse(
         vm_name=vm_status.vm_name,

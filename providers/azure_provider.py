@@ -9,6 +9,8 @@ Provisioning order (required by ARM dependency graph):
 """
 
 import os
+import time
+import socket
 import paramiko
 from pathlib import Path
 from datetime import datetime
@@ -171,7 +173,8 @@ class AzureProvider(CloudProvider):
             log(f"✅ NIC '{nic_result.name}' ready.")
 
             # 7. Virtual Machine
-            with open(config.ssh_key_path, "r") as f:
+            ssh_pub_key_path = str(Path(config.ssh_key_path).expanduser())
+            with open(ssh_pub_key_path, "r") as f:
                 ssh_key_data = f.read()
 
             vm_params = {
@@ -219,6 +222,8 @@ class AzureProvider(CloudProvider):
                 "location": loc,
                 "admin_username": config.admin_username,
                 "public_ip": ip_result.ip_address,
+                # Derive private key path: strip .pub suffix if present
+                "ssh_private_key_path": ssh_pub_key_path.removesuffix(".pub"),
             }
             log(f"🎉 Provisioning complete! VM reachable at {ip_result.ip_address}")
             return state
@@ -243,7 +248,11 @@ class AzureProvider(CloudProvider):
         """
         ip_address = state["public_ip"]
         username = state["admin_username"]
-        private_key_path = str(Path.home() / ".ssh" / "id_rsa")
+        # Prefer key stored during provision; fall back to default id_rsa
+        private_key_path = state.get(
+            "ssh_private_key_path",
+            str(Path.home() / ".ssh" / "id_rsa"),
+        )
 
         # Generate dynamic HTML from template
         self._ensure_clients()
@@ -264,6 +273,9 @@ class AzureProvider(CloudProvider):
         log("✅ Dashboard HTML generated.")
 
         try:
+            # Wait until SSH daemon is ready (VM may still be booting)
+            self._wait_for_ssh(ip_address, log=log)
+
             ssh = paramiko.SSHClient()
             # NOTE: In production, load known_hosts instead of AutoAddPolicy.
             # AutoAddPolicy is acceptable here because we just created this VM
@@ -390,12 +402,16 @@ class AzureProvider(CloudProvider):
         """
         ip_address = state["public_ip"]
         username = state["admin_username"]
-        private_key_path = str(Path.home() / ".ssh" / "id_rsa")
+        private_key_path = state.get(
+            "ssh_private_key_path",
+            str(Path.home() / ".ssh" / "id_rsa"),
+        )
 
         flag = "-f" if follow else "--tail 200"
         cmd = f"sudo docker logs {flag} {DOCKER_CONTAINER_NAME} 2>&1"
 
         try:
+            self._wait_for_ssh(ip_address, log=log)
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             ssh.connect(ip_address, username=username, key_filename=private_key_path)
@@ -444,6 +460,25 @@ class AzureProvider(CloudProvider):
     # ------------------------------------------------------------------
     # private helpers
     # ------------------------------------------------------------------
+
+    def _wait_for_ssh(self, ip: str, port: int = 22, timeout: int = 180, log=print) -> None:
+        """
+        Poll TCP port 22 until the SSH daemon is ready or timeout expires.
+        Azure VMs can take 60-120 s to fully boot after the API returns.
+        """
+        log(f"⏳ Waiting for SSH on {ip}:{port} (up to {timeout}s)...")
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                with socket.create_connection((ip, port), timeout=5):
+                    log(f"✅ SSH port open on {ip}.")
+                    return
+            except OSError:
+                time.sleep(5)
+        raise RuntimeError(
+            f"Timed out waiting for SSH on {ip}:{port} after {timeout}s. "
+            "The VM may still be booting — try deploying again in a minute."
+        )
 
     def _exec(self, ssh: paramiko.SSHClient, command: str, log=print) -> int:
         """Execute a remote command over SSH, stream stdout/stderr to log()."""

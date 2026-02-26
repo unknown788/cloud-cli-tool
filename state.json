@@ -1,0 +1,9 @@
+{
+  "provider": "azure",
+  "resource_group": "cloudlaunch-rg",
+  "vm_name": "cloudlaunch-vm",
+  "location": "southeastasia",
+  "admin_username": "azureuser",
+  "public_ip": "52.139.207.224",
+  "ssh_private_key_path": "/home/saurabh-1/.ssh/id_rsa"
+}
