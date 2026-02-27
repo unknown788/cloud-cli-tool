@@ -29,6 +29,7 @@ Design decisions:
 
 import json
 import os
+import uuid
 import asyncio
 import functools
 from pathlib import Path
@@ -373,15 +374,23 @@ def provision(req: ProvisionRequest, request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
     ssh_key_path = req.ssh_key_path.replace("~", str(Path.home()))
+
+    # Always generate a unique suffix so each provision gets its own resource
+    # group — avoids Azure's "customData cannot be changed" error on retry
+    # and allows safe concurrent demos.
+    suffix = uuid.uuid4().hex[:8]
+    unique_rg      = f"{req.resource_group}-{suffix}"
+    unique_vm_name = f"{req.vm_name}-{suffix}"
+
     config = ProvisionConfig(
-        vm_name=req.vm_name,
+        vm_name=unique_vm_name,
         location=req.location,
         admin_username=req.admin_username,
         ssh_key_path=ssh_key_path,
-        resource_group=req.resource_group,
+        resource_group=unique_rg,
     )
     caller_ip = _get_client_ip(request)
-    write_audit("PROVISION", caller_ip, f"vm={req.vm_name} rg={req.resource_group}")
+    write_audit("PROVISION", caller_ip, f"vm={unique_vm_name} rg={unique_rg}")
 
     def _provision_and_save(log=print):
         """Provision, persist state, then arm the auto-destroy timer."""
