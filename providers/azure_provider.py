@@ -28,7 +28,7 @@ from .base import CloudProvider, ProvisionConfig, VMStatus
 DOCKER_IMAGE_NAME = "cloudlaunch-webapp"
 DOCKER_CONTAINER_NAME = "cloudlaunch-container"
 APP_DIR_NAME = "sample_app"
-DOCKERFILE_NAME = "Dockerfile"
+DOCKERFILE_NAME = "Dockerfile.app"
 
 
 class AzureProvider(CloudProvider):
@@ -326,9 +326,10 @@ systemctl start docker
             log("✅ Docker ready.")
 
             # Upload app + Dockerfile via SFTP
+            # Dockerfile.app is renamed to Dockerfile on the VM so docker build works
             sftp = ssh.open_sftp()
             remote_home = f"/home/{username}"
-            sftp.put(DOCKERFILE_NAME, f"{remote_home}/{DOCKERFILE_NAME}")
+            sftp.put(DOCKERFILE_NAME, f"{remote_home}/Dockerfile")
             self._upload_directory(sftp, APP_DIR_NAME, f"{remote_home}/{APP_DIR_NAME}")
             sftp.close()
             log("✅ App files uploaded via SFTP.")
