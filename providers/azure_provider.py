@@ -8,6 +8,7 @@ Provisioning order (required by ARM dependency graph):
   Resource Group → VNet → Subnet → Public IP → NSG → NIC → VM
 """
 
+import io
 import os
 import time
 import socket
@@ -172,10 +173,16 @@ class AzureProvider(CloudProvider):
             ).result()
             log(f"✅ NIC '{nic_result.name}' ready.")
 
-            # 7. Virtual Machine
-            ssh_pub_key_path = str(Path(config.ssh_key_path).expanduser())
-            with open(ssh_pub_key_path, "r") as f:
-                ssh_key_data = f.read()
+            # 7. Virtual Machine — generate a fresh SSH keypair in memory
+            rsa_key = paramiko.RSAKey.generate(2048)
+            pub_key_buf = io.StringIO()
+            rsa_key.write_private_key(pub_key_buf)   # not used yet, just generate
+            ssh_key_data = f"ssh-rsa {rsa_key.get_base64()} cloudlaunch-ephemeral"
+
+            # Store private key as string so deploy() can use it without a file
+            priv_key_buf = io.StringIO()
+            rsa_key.write_private_key(priv_key_buf)
+            ssh_private_key_str = priv_key_buf.getvalue()
 
             vm_params = {
                 "location": loc,
@@ -222,12 +229,8 @@ class AzureProvider(CloudProvider):
                 "location": loc,
                 "admin_username": config.admin_username,
                 "public_ip": ip_result.ip_address,
-                # Derive private key path: strip .pub suffix if present
-                "ssh_private_key_path": (
-                    ssh_pub_key_path[:-4]
-                    if ssh_pub_key_path.endswith(".pub")
-                    else ssh_pub_key_path
-                ),
+                # Private key stored as string — no file needed on the server
+                "ssh_private_key_str": ssh_private_key_str,
             }
             log(f"🎉 Provisioning complete! VM reachable at {ip_result.ip_address}")
             return state
@@ -252,11 +255,19 @@ class AzureProvider(CloudProvider):
         """
         ip_address = state["public_ip"]
         username = state["admin_username"]
-        # Prefer key stored during provision; fall back to default id_rsa
-        private_key_path = state.get(
-            "ssh_private_key_path",
-            str(Path.home() / ".ssh" / "id_rsa"),
-        )
+        # Load private key from state string (generated at provision time)
+        # Fall back to file path for backward-compat with old state.json entries
+        pkey = None
+        if state.get("ssh_private_key_str"):
+            pkey = paramiko.RSAKey.from_private_key(
+                io.StringIO(state["ssh_private_key_str"])
+            )
+            private_key_path = None
+        else:
+            private_key_path = state.get(
+                "ssh_private_key_path",
+                str(Path.home() / ".ssh" / "id_rsa"),
+            )
 
         # Generate dynamic HTML from template
         self._ensure_clients()
@@ -285,7 +296,10 @@ class AzureProvider(CloudProvider):
             # AutoAddPolicy is acceptable here because we just created this VM
             # and know its IP — it hasn't had time to be MITM'd.
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(ip_address, username=username, key_filename=private_key_path)
+            ssh.connect(
+                ip_address, username=username,
+                pkey=pkey, key_filename=private_key_path,
+            )
             log(f"🔗 SSH connected to {username}@{ip_address}")
 
             # Install Docker
@@ -406,10 +420,17 @@ class AzureProvider(CloudProvider):
         """
         ip_address = state["public_ip"]
         username = state["admin_username"]
-        private_key_path = state.get(
-            "ssh_private_key_path",
-            str(Path.home() / ".ssh" / "id_rsa"),
-        )
+        pkey = None
+        if state.get("ssh_private_key_str"):
+            pkey = paramiko.RSAKey.from_private_key(
+                io.StringIO(state["ssh_private_key_str"])
+            )
+            private_key_path = None
+        else:
+            private_key_path = state.get(
+                "ssh_private_key_path",
+                str(Path.home() / ".ssh" / "id_rsa"),
+            )
 
         flag = "-f" if follow else "--tail 200"
         cmd = f"sudo docker logs {flag} {DOCKER_CONTAINER_NAME} 2>&1"
@@ -418,7 +439,10 @@ class AzureProvider(CloudProvider):
             self._wait_for_ssh(ip_address, log=log)
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(ip_address, username=username, key_filename=private_key_path)
+            ssh.connect(
+                ip_address, username=username,
+                pkey=pkey, key_filename=private_key_path,
+            )
             log(f"🔗 Connected to {username}@{ip_address}")
 
             if follow:
