@@ -1429,7 +1429,7 @@
 'use strict';
 
 // ── Config ────────────────────────────────────────────────────────
-const API = '';   // same origin — FastAPI serves this file
+const API = 'https://cloud-cli-tool-96d7a0b5f493.herokuapp.com';  // Heroku backend
 
 // ── State ─────────────────────────────────────────────────────────
 let _ttlDestroyAt  = null;   // Date when auto-destroy fires (from quota endpoint)
@@ -1645,8 +1645,8 @@ async function fetchJSON(url, opts = {}) {
 
 // ── WebSocket streaming ───────────────────────────────────────────
 function streamJob(jobId, onResult) {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const host  = location.host || 'localhost:8000';
+  const proto = 'wss';
+  const host  = 'cloud-cli-tool-96d7a0b5f493.herokuapp.com';
   const ws    = new WebSocket(`${proto}://${host}/ws/${jobId}`);
   setTermStatus('running');
 
