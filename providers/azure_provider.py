@@ -302,9 +302,8 @@ class AzureProvider(CloudProvider):
             )
             log(f"🔗 SSH connected to {username}@{ip_address}")
 
-            # Install Docker
-            self._exec(ssh, "sudo apt-get update -y", log)
-            self._exec(ssh, "sudo apt-get install -y docker.io", log)
+            # Install Docker via official convenience script (works on Ubuntu 22.04+)
+            self._exec(ssh, "curl -fsSL https://get.docker.com | sudo sh", log)
             self._exec(ssh, f"sudo usermod -aG docker {username}", log)
             log("✅ Docker installed on VM.")
 
@@ -320,8 +319,8 @@ class AzureProvider(CloudProvider):
             self._exec(ssh, f"cd {remote_home} && sudo docker build -t {DOCKER_IMAGE_NAME} .", log)
 
             # Stop old container (ignore error if not running)
-            self._exec(ssh, f"sudo docker stop {DOCKER_CONTAINER_NAME} || true", log)
-            self._exec(ssh, f"sudo docker rm {DOCKER_CONTAINER_NAME} || true", log)
+            self._exec(ssh, f"sudo docker stop {DOCKER_CONTAINER_NAME} || true", log, check=False)
+            self._exec(ssh, f"sudo docker rm {DOCKER_CONTAINER_NAME} || true", log, check=False)
 
             # Run new container — Nginx listens on 80 inside, mapped to host 80
             run_cmd = (
@@ -508,17 +507,28 @@ class AzureProvider(CloudProvider):
             "The VM may still be booting — try deploying again in a minute."
         )
 
-    def _exec(self, ssh: paramiko.SSHClient, command: str, log=print) -> int:
-        """Execute a remote command over SSH, stream stdout/stderr to log()."""
+    def _exec(self, ssh: paramiko.SSHClient, command: str, log=print, check: bool = True) -> int:
+        """Execute a remote command over SSH, stream stdout/stderr to log().
+
+        Args:
+            check: If True (default), raise RuntimeError on non-zero exit.
+                   Pass check=False for commands where failure is acceptable
+                   (e.g. `docker stop ... || true`).
+        """
         log(f"  $ {command}")
         _, stdout, stderr = ssh.exec_command(command)
         exit_status = stdout.channel.recv_exit_status()
         output = stdout.read().decode().strip()
-        error = stderr.read().decode().strip()
+        error  = stderr.read().decode().strip()
         if output:
             log(f"    {output}")
-        if exit_status != 0 and error:
-            log(f"    ⚠ {error}")
+        if exit_status != 0:
+            if error:
+                log(f"    ⚠ {error}")
+            if check:
+                raise RuntimeError(
+                    f"Command failed (exit {exit_status}): {command}\n{error}"
+                )
         return exit_status
 
     def _upload_directory(self, sftp: paramiko.SFTPClient, local_path: str, remote_path: str) -> None:
