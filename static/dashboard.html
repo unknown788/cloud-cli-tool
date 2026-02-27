@@ -930,10 +930,6 @@
             <label>Admin Username</label>
             <input id="cfg-username" value="azureuser" />
           </div>
-          <div class="field">
-            <label>SSH Public Key Path</label>
-            <input id="cfg-ssh-key" value="~/.ssh/id_rsa.pub" />
-          </div>
         </div>
       </div>
     </div>
@@ -1735,7 +1731,7 @@ function getConfig() {
     resource_group: document.getElementById('cfg-rg').value,
     location:       document.getElementById('cfg-location').value,
     admin_username: document.getElementById('cfg-username').value,
-    ssh_key_path:   document.getElementById('cfg-ssh-key').value,
+    ssh_key_path:   'ignored',   // key is generated in memory server-side
   };
 }
 

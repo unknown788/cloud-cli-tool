@@ -693,7 +693,10 @@ async def websocket_logs(websocket: WebSocket, job_id: str):
 
     skipped   = 0    # count of already-replayed items we consume but don't send
     ping_count = 0   # how many consecutive timeouts (pings) we've sent
-    MAX_PINGS  = 4   # 4 × 15 s = 60 seconds max wait before declaring job dead
+    # Destroy deletes an entire Azure resource group — that takes 1-3 min even
+    # after the provider call returns.  Give it up to 8 min (32 × 15 s).
+    # Provision/deploy are faster — 5 min (20 × 15 s) is plenty.
+    MAX_PINGS  = 32 if job.operation == "destroy" else 20
 
     try:
         while True:
@@ -710,8 +713,13 @@ async def websocket_logs(websocket: WebSocket, job_id: str):
                     # Job thread is almost certainly dead (server was restarted
                     # while the job was running, or the thread crashed without
                     # sending the sentinel). Force-fail and close cleanly.
+                    timeout_mins = MAX_PINGS * 15 // 60
                     job.status = JobStatus.FAILED
-                    job.error  = "Job timed out — the server was likely restarted while this operation was running."
+                    job.error  = (
+                        f"Job timed out after {timeout_mins} min — "
+                        "the server was likely restarted while this operation was running. "
+                        "Check Azure Portal to verify resource cleanup."
+                    )
                     break
                 await send({"type": "ping"})
                 continue
