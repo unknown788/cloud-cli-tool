@@ -1,0 +1,27 @@
+# Dev / CI artefacts
+.env
+.env.*
+!.env.example
+*.log
+*.cast
+state.json
+audit.log
+
+# Git
+.git
+.gitignore
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Docs / interview prep — not needed in the image
+interview-prep/
+README.md
+
+# Sample app is only needed locally (deployed to VMs via Docker)
+# Dockerfile.app handles that separately
+sample_app/index.html
