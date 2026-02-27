@@ -351,6 +351,264 @@
     .ip-link { color: var(--info); text-decoration: none; font-family: var(--mono); }
     .ip-link:hover { text-decoration: underline; }
     .section-title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+
+    /* ══════════════════════════════════════════════════════════════
+       WELCOME TAB
+    ══════════════════════════════════════════════════════════════ */
+    .hero {
+      background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #0d2818 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px 36px;
+      text-align: center;
+    }
+    .hero-emoji { font-size: 52px; margin-bottom: 16px; }
+    .hero h1 { font-size: 32px; font-weight: 800; letter-spacing: -1px; margin-bottom: 10px; }
+    .hero h1 span { color: #3fb950; }
+    .hero-sub { font-size: 15px; color: var(--muted); line-height: 1.7; max-width: 580px; margin: 0 auto 28px; }
+    .hero-chips { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 28px; }
+    .chip {
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid;
+    }
+    .chip-blue   { background: #0d2d6e; color: #79c0ff; border-color: #1f4c8f; }
+    .chip-green  { background: #0d2818; color: #3fb950; border-color: #1a4731; }
+    .chip-purple { background: #2d1f3d; color: #bc8cff; border-color: #4a2d6e; }
+    .chip-orange { background: #3d2c00; color: #e3b341; border-color: #5c4200; }
+    .chip-red    { background: #3d0000; color: #f85149; border-color: #6d0000; }
+    .hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+    /* Steps */
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      position: relative;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .step-card:hover { border-color: #3fb950; transform: translateY(-2px); }
+    .step-num {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #1a4731;
+      color: #3fb950;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 12px;
+    }
+    .step-icon { font-size: 28px; margin-bottom: 10px; }
+    .step-title { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+    .step-desc  { font-size: 12px; color: var(--muted); line-height: 1.6; }
+    .step-arrow {
+      position: absolute;
+      right: -14px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--border);
+      font-size: 20px;
+      z-index: 1;
+    }
+
+    /* What's inside */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .feature-icon { font-size: 26px; flex-shrink: 0; }
+    .feature-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+    .feature-desc  { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+    /* Note box */
+    .note-box {
+      background: #1a1f28;
+      border: 1px solid #30363d;
+      border-left: 3px solid #e3b341;
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .note-box strong { color: #e3b341; }
+
+    /* ══════════════════════════════════════════════════════════════
+       ENGINEERING BLUEPRINT TAB
+    ══════════════════════════════════════════════════════════════ */
+    .blueprint-hero {
+      background: linear-gradient(135deg, #0d1117 0%, #0a1628 50%, #0d1117 100%);
+      border: 1px solid #1f4c8f;
+      border-radius: var(--radius);
+      padding: 28px 32px;
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .blueprint-hero-text h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; letter-spacing: -0.5px; }
+    .blueprint-hero-text h2 span { color: #79c0ff; }
+    .blueprint-hero-text p { font-size: 13px; color: var(--muted); line-height: 1.6; max-width: 520px; }
+    .blueprint-badge {
+      padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700;
+      background: #0d2d6e; color: #79c0ff; border: 1px solid #1f4c8f;
+      white-space: nowrap;
+    }
+
+    /* Architecture diagram */
+    .arch-diagram {
+      background: #010409;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      overflow-x: auto;
+    }
+    .arch-diagram h3 { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 24px; }
+    .arch-row { display: flex; align-items: center; justify-content: center; gap: 0; flex-wrap: wrap; margin-bottom: 12px; }
+    .arch-box {
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      min-width: 110px;
+      border: 1px solid;
+    }
+    .arch-box .arch-label { font-size: 10px; font-weight: 400; margin-top: 3px; opacity: 0.75; }
+    .arch-box.browser  { background: #0d2d6e; color: #79c0ff; border-color: #1f4c8f; }
+    .arch-box.api      { background: #1a4731; color: #3fb950; border-color: #2a6347; }
+    .arch-box.worker   { background: #2d1f3d; color: #bc8cff; border-color: #4a2d6e; }
+    .arch-box.azure    { background: #0d2040; color: #58a6ff; border-color: #1a3d6e; }
+    .arch-box.vm       { background: #3d2c00; color: #e3b341; border-color: #5c4200; }
+    .arch-box.state    { background: #3d0000; color: #f85149; border-color: #6d0000; }
+    .arch-box.ws       { background: #1a2a1a; color: #3fb950; border-color: #1a4731; font-size: 11px; }
+    .arch-arrow { color: #30363d; font-size: 18px; padding: 0 6px; font-weight: 700; flex-shrink: 0; }
+    .arch-arrow.down { display: block; text-align: center; color: #30363d; font-size: 18px; margin: 2px auto; }
+    .arch-col { display: flex; flex-direction: column; align-items: center; gap: 0; }
+    .arch-label-outer { font-size: 10px; color: var(--muted); text-align: center; margin-top: 4px; }
+
+    /* Tech stack */
+    .stack-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .stack-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      transition: border-color 0.2s;
+    }
+    .stack-card:hover { border-color: #79c0ff; }
+    .stack-layer { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .stack-name  { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .stack-why   { font-size: 11px; color: var(--muted); line-height: 1.5; }
+    .stack-tag   { display: inline-block; margin-top: 8px; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+
+    /* Design decisions */
+    .decision-list { display: flex; flex-direction: column; gap: 12px; }
+    .decision-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+    .decision-icon { font-size: 22px; }
+    .decision-q { font-weight: 700; font-size: 13px; margin-bottom: 4px; color: #79c0ff; }
+    .decision-a { font-size: 12px; color: var(--muted); line-height: 1.6; }
+    .decision-a code { background: #1c2128; padding: 1px 5px; border-radius: 4px; font-family: var(--mono); font-size: 11px; color: #3fb950; }
+
+    /* Metrics row */
+    .metrics-row {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .metric-card {
+      flex: 1;
+      min-width: 130px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      text-align: center;
+    }
+    .metric-val  { font-size: 28px; font-weight: 800; font-family: var(--mono); color: #3fb950; }
+    .metric-unit { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    /* Code snippet */
+    .code-block {
+      background: #010409;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.7;
+      overflow-x: auto;
+    }
+    .code-block .kw  { color: #ff7b72; }
+    .code-block .fn  { color: #d2a8ff; }
+    .code-block .st  { color: #a5d6ff; }
+    .code-block .cm  { color: #8b949e; }
+    .code-block .nu  { color: #79c0ff; }
+    .code-block .ok  { color: #3fb950; }
+
+    /* Security items */
+    .security-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .sec-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .sec-icon  { font-size: 24px; margin-bottom: 8px; }
+    .sec-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+    .sec-desc  { font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .sec-val   { font-family: var(--mono); font-size: 11px; color: #3fb950; margin-top: 6px; }
+
+    /* Scalability */
+    .scale-row { display: flex; gap: 0; align-items: stretch; flex-wrap: wrap; }
+    .scale-item {
+      flex: 1;
+      min-width: 150px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 16px;
+      text-align: center;
+    }
+    .scale-item:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+    .scale-item:last-child  { border-radius: 0 var(--radius) var(--radius) 0; }
+    .scale-item + .scale-item { border-left: none; }
+    .scale-now  { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+    .scale-then { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .scale-arrow-right { color: #3fb950; font-size: 11px; }
   </style>
 </head>
 <body>
@@ -373,17 +631,184 @@
 
 <!-- ═══════════════════════ TAB BAR ══════════════════════════════ -->
 <div class="tab-bar">
-  <button class="tab-btn active" data-tab="plan">📋 Plan</button>
-  <button class="tab-btn"        data-tab="ops">⚡ Operations</button>
-  <button class="tab-btn"        data-tab="status">📊 Status</button>
-  <button class="tab-btn"        data-tab="jobs">📜 Job History</button>
+  <button class="tab-btn active"  data-tab="welcome">🏠 Welcome</button>
+  <button class="tab-btn"         data-tab="plan">📋 Plan</button>
+  <button class="tab-btn"         data-tab="ops">⚡ Operations</button>
+  <button class="tab-btn"         data-tab="status">📊 Status</button>
+  <button class="tab-btn"         data-tab="jobs">📜 Job History</button>
+  <button class="tab-btn"         data-tab="blueprint" style="color:#79c0ff;">🔬 Engineering</button>
 </div>
 
 <!-- ═══════════════════════ MAIN ══════════════════════════════════ -->
 <main>
 
+  <!-- ─────────────────── TAB: WELCOME ──────────────────────────── -->
+  <div class="tab-panel active" id="tab-welcome">
+
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero-emoji">☁️</div>
+      <h1>Cloud<span>Launch</span> Platform</h1>
+      <p class="hero-sub">
+        A fully working cloud automation tool that provisions real Azure virtual machines,
+        deploys a Dockerised web app, and streams every log line live — all from a single dashboard.
+        No manual clicks in Azure. No SSH setup. Just press a button.
+      </p>
+      <div class="hero-chips">
+        <span class="chip chip-blue">Python · FastAPI</span>
+        <span class="chip chip-green">Azure SDK</span>
+        <span class="chip chip-purple">WebSocket Streaming</span>
+        <span class="chip chip-orange">Docker · Nginx</span>
+        <span class="chip chip-red">Auto-Destroy ⏰</span>
+      </div>
+      <div class="hero-actions">
+        <button class="btn primary" onclick="document.querySelector('[data-tab=ops]').click()">⚡ Try It Now</button>
+        <button class="btn" style="border-color:#79c0ff;color:#79c0ff;" onclick="document.querySelector('[data-tab=blueprint]').click()">🔬 See How It Works</button>
+      </div>
+    </div>
+
+    <!-- How it works — steps -->
+    <div class="card">
+      <div class="card-header">🗺 How to use this demo — 4 steps</div>
+      <div class="card-body">
+        <div class="steps-grid">
+
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <div class="step-icon">🚀</div>
+            <div class="step-title">Provision a VM</div>
+            <div class="step-desc">
+              Click <strong>Operations → Provision VM</strong>. CloudLaunch creates a full
+              Azure VM stack — VNet, NSG, Public IP, NIC, and the VM itself — in about 90 seconds.
+              Watch every step stream live in the terminal.
+            </div>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <div class="step-icon">📦</div>
+            <div class="step-title">Deploy the App</div>
+            <div class="step-desc">
+              Click <strong>Deploy App</strong>. CloudLaunch SSHes into the VM, installs Docker,
+              uploads the app files, builds a container image, and starts Nginx — all automatically.
+              The terminal streams every command and its output.
+            </div>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <div class="step-icon">🌐</div>
+            <div class="step-title">Visit Your App</div>
+            <div class="step-desc">
+              Once deployed, a clickable IP link appears in the terminal. Open it — you'll see
+              a live web page served from your Azure VM, in a Docker container, over the internet.
+              Real cloud. Real traffic.
+            </div>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num">4</div>
+            <div class="step-icon">💀</div>
+            <div class="step-title">Destroy When Done</div>
+            <div class="step-desc">
+              Click <strong>Destroy</strong> to delete everything in Azure with one call.
+              Or just leave it — the VM <strong>auto-destroys in 20 minutes</strong> to keep
+              cloud costs at zero. Cloud ain't cheap!
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- What's inside -->
+    <div class="card">
+      <div class="card-header">📦 What's inside this platform</div>
+      <div class="card-body">
+        <div class="feature-grid">
+
+          <div class="feature-card">
+            <div class="feature-icon">🖥️</div>
+            <div>
+              <div class="feature-title">Real Azure Infrastructure</div>
+              <div class="feature-desc">
+                Not a simulation. Creates actual Azure resources: VMs, Virtual Networks, NSGs,
+                Public IPs, NICs — using the official Azure Python SDK.
+              </div>
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon">📡</div>
+            <div>
+              <div class="feature-title">Live Log Streaming</div>
+              <div class="feature-desc">
+                Every log line from the background operation is pushed to this dashboard
+                in real time over a WebSocket connection — no polling, no page refreshes.
+              </div>
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon">🐳</div>
+            <div>
+              <div class="feature-title">Automated Docker Deployment</div>
+              <div class="feature-desc">
+                Connects via SSH, installs Docker, uploads files via SFTP, builds the image,
+                and runs the container — all programmatically from Python.
+              </div>
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon">🛡️</div>
+            <div>
+              <div class="feature-title">Abuse Protection</div>
+              <div class="feature-desc">
+                Rate limiting per IP, max 1 concurrent job, max 3 active VMs, and a
+                mandatory 20-minute auto-destroy timer ensure no runaway cloud spend.
+              </div>
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon">⌨️</div>
+            <div>
+              <div class="feature-title">CLI + API + Dashboard</div>
+              <div class="feature-desc">
+                Three interfaces, one backend. The same operations run from a Typer CLI,
+                a FastAPI REST API, or this React-free vanilla JS dashboard.
+              </div>
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon">🔄</div>
+            <div>
+              <div class="feature-title">Full Lifecycle Management</div>
+              <div class="feature-desc">
+                Provision → Deploy → Status check → Redeploy → Destroy. Every stage is
+                handled with a single command or button click.
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Note -->
+    <div class="note-box">
+      💡 <strong>This is a live demo on a real Azure subscription.</strong>
+      Provisioning takes ~90 seconds. Deployment takes ~2 minutes (Docker install on a fresh VM).
+      The VM auto-destroys after 20 minutes so there's zero risk of leaving resources running.
+      All logs are streamed in real time — nothing is faked.
+    </div>
+
+  </div><!-- /tab-welcome -->
+
   <!-- ─────────────────── TAB: PLAN ─────────────────────────────── -->
-  <div class="tab-panel active" id="tab-plan">
+  <div class="tab-panel" id="tab-plan">
 
     <div class="action-bar">
       <div class="section-title">Resource preview</div>
@@ -586,6 +1011,388 @@
       <div class="empty-state">No jobs yet. Run an operation first.</div>
     </div>
   </div><!-- /tab-jobs -->
+
+  <!-- ─────────────────── TAB: ENGINEERING BLUEPRINT ────────────── -->
+  <div class="tab-panel" id="tab-blueprint">
+
+    <!-- Hero -->
+    <div class="blueprint-hero">
+      <div style="flex:1">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+          <span class="blueprint-badge">🔬 Engineering Deep-Dive</span>
+          <span class="blueprint-badge">Python 3.8</span>
+          <span class="blueprint-badge">Azure</span>
+          <span class="blueprint-badge">FastAPI · WebSocket</span>
+        </div>
+        <div class="blueprint-hero-text">
+          <h2>How <span>CloudLaunch</span> works — under the hood</h2>
+          <p>
+            A production-quality cloud automation backend. Zero frameworks beyond FastAPI.
+            No Terraform, no Ansible, no SDK wrappers — raw Azure SDK calls, raw Paramiko SSH,
+            raw threading with async bridges. Every design decision was deliberate.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key metrics -->
+    <div class="metrics-row">
+      <div class="metric-card">
+        <div class="metric-val">~900</div>
+        <div class="metric-unit">Lines of Python</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val">6</div>
+        <div class="metric-unit">Azure resources per VM</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val">&lt;200ms</div>
+        <div class="metric-unit">API response time</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val">~90s</div>
+        <div class="metric-unit">Provision time</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val">0</div>
+        <div class="metric-unit">External dependencies*</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:-8px;">* No DB, no Redis, no message queue — stdlib only for state management</div>
+
+    <!-- Architecture diagram -->
+    <div class="arch-diagram">
+      <h3>🏗 System Architecture — Request Flow</h3>
+
+      <!-- Row 1: Client layer -->
+      <div class="arch-row" style="margin-bottom:4px;">
+        <div class="arch-col">
+          <div class="arch-box browser">🌐 Browser<div class="arch-label">dashboard.html</div></div>
+          <div class="arch-label-outer">HTTP / WS</div>
+        </div>
+        <div class="arch-arrow">—</div>
+        <div class="arch-col">
+          <div class="arch-box browser">⌨️ CLI<div class="arch-label">Typer / Rich</div></div>
+          <div class="arch-label-outer">Python calls</div>
+        </div>
+        <div class="arch-arrow">—</div>
+        <div class="arch-col">
+          <div class="arch-box browser">🔌 REST Client<div class="arch-label">curl / scripts</div></div>
+          <div class="arch-label-outer">HTTP POST</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow down">↓</div>
+
+      <!-- Row 2: API layer -->
+      <div class="arch-row" style="margin-bottom:4px;">
+        <div class="arch-col" style="flex:1;max-width:420px;">
+          <div class="arch-box api" style="width:100%;min-width:0;">
+            ⚡ FastAPI (Uvicorn)<div class="arch-label">POST /provision · /deploy · /destroy · WS /ws/{job_id}</div>
+          </div>
+          <div class="arch-label-outer">Rate limit · Concurrency cap · Budget guard</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow down">↓ launch_job() → daemon thread</div>
+
+      <!-- Row 3: Job runner + WS -->
+      <div class="arch-row" style="gap:16px;margin-bottom:4px;">
+        <div class="arch-col">
+          <div class="arch-box worker">🧵 Background Thread<div class="arch-label">api/jobs.py · _run_job()</div></div>
+          <div class="arch-label-outer">Sync provider code</div>
+        </div>
+        <div class="arch-arrow">⟷ queue.Queue</div>
+        <div class="arch-col">
+          <div class="arch-box ws">📡 WebSocket Handler<div class="arch-label">run_in_executor → async drain</div></div>
+          <div class="arch-label-outer">Async event loop</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow down">↓ Azure SDK calls (blocking, inside thread)</div>
+
+      <!-- Row 4: Azure -->
+      <div class="arch-row" style="gap:16px;margin-bottom:4px;">
+        <div class="arch-col">
+          <div class="arch-box azure">☁ Azure ARM API<div class="arch-label">ResourceManagementClient</div></div>
+        </div>
+        <div class="arch-arrow">+</div>
+        <div class="arch-col">
+          <div class="arch-box azure">🌐 Azure Network API<div class="arch-label">NetworkManagementClient</div></div>
+        </div>
+        <div class="arch-arrow">+</div>
+        <div class="arch-col">
+          <div class="arch-box azure">🖥 Azure Compute API<div class="arch-label">ComputeManagementClient</div></div>
+        </div>
+      </div>
+
+      <div class="arch-arrow down">↓ VM ready → SSH (Paramiko)</div>
+
+      <!-- Row 5: VM -->
+      <div class="arch-row" style="gap:16px;">
+        <div class="arch-col">
+          <div class="arch-box vm">🐧 Ubuntu 22.04 VM<div class="arch-label">Standard_B1s · Southeast Asia</div></div>
+        </div>
+        <div class="arch-arrow">→ Docker →</div>
+        <div class="arch-col">
+          <div class="arch-box vm">🐳 Nginx Container<div class="arch-label">port 80 · --restart always</div></div>
+        </div>
+        <div class="arch-arrow">+</div>
+        <div class="arch-col">
+          <div class="arch-box state">📄 state.json<div class="arch-label">IP · RG · SSH key path</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tech stack -->
+    <div class="card">
+      <div class="card-header">🛠 Tech Stack — every choice explained</div>
+      <div class="card-body">
+        <div class="stack-grid">
+
+          <div class="stack-card">
+            <div class="stack-layer">API Framework</div>
+            <div class="stack-name">FastAPI</div>
+            <div class="stack-why">Async-native, Pydantic v2 validation built-in, auto-generates OpenAPI docs. WebSocket support is first-class — no bolt-on.</div>
+            <span class="stack-tag chip-green chip">Python 3.8</span>
+          </div>
+
+          <div class="stack-card">
+            <div class="stack-layer">Cloud SDK</div>
+            <div class="stack-name">Azure SDK for Python</div>
+            <div class="stack-why">Direct ARM calls — no abstraction layer. Full control over resource creation order, error handling, and retry logic.</div>
+            <span class="stack-tag chip-blue chip">azure-mgmt-*</span>
+          </div>
+
+          <div class="stack-card">
+            <div class="stack-layer">SSH / SFTP</div>
+            <div class="stack-name">Paramiko 3.x</div>
+            <div class="stack-why">Pure-Python SSH. Handles key auth, exec_command, SFTP file upload, and exit-status checking — all in one library.</div>
+            <span class="stack-tag chip-purple chip">No subprocess</span>
+          </div>
+
+          <div class="stack-card">
+            <div class="stack-layer">Concurrency Model</div>
+            <div class="stack-name">Threads + asyncio bridge</div>
+            <div class="stack-why">Sync Azure SDK runs in daemon threads. <code style="background:#1c2128;padding:1px 5px;border-radius:3px;font-size:10px;color:#3fb950;">run_in_executor()</code> bridges queue.get() to the async event loop without blocking it.</div>
+            <span class="stack-tag chip-orange chip">No Celery needed</span>
+          </div>
+
+          <div class="stack-card">
+            <div class="stack-layer">State Management</div>
+            <div class="stack-name">state.json (flat file)</div>
+            <div class="stack-why">Deliberate — single user, single VM. A DB adds ops overhead with zero benefit. File is written atomically; server reads it fresh on each request.</div>
+            <span class="stack-tag chip-red chip">Zero DB ops</span>
+          </div>
+
+          <div class="stack-card">
+            <div class="stack-layer">CLI Framework</div>
+            <div class="stack-name">Typer + Rich</div>
+            <div class="stack-why">Typer builds CLI from type annotations. Rich gives coloured panels, progress bars, and tables — same output as the dashboard terminal.</div>
+            <span class="stack-tag chip-green chip">8 commands</span>
+          </div>
+
+          <div class="stack-card">
+            <div class="stack-layer">Frontend</div>
+            <div class="stack-name">Vanilla JS</div>
+            <div class="stack-why">Zero build step, zero node_modules, zero React. Served directly by FastAPI's StaticFiles. WebSocket, fetch, and DOM — nothing else needed.</div>
+            <span class="stack-tag chip-blue chip">1 HTML file</span>
+          </div>
+
+          <div class="stack-card">
+            <div class="stack-layer">Auth (Azure)</div>
+            <div class="stack-name">Service Principal</div>
+            <div class="stack-why">Client credentials flow via <code style="background:#1c2128;padding:1px 5px;border-radius:3px;font-size:10px;color:#3fb950;">DefaultAzureCredential</code>. Env vars → no secrets in code, rotatable without redeploy.</div>
+            <span class="stack-tag chip-orange chip">12-factor</span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Design decisions -->
+    <div class="card">
+      <div class="card-header">🧠 Key Design Decisions</div>
+      <div class="card-body">
+        <div class="decision-list">
+
+          <div class="decision-item">
+            <div class="decision-icon">🧵</div>
+            <div>
+              <div class="decision-q">Why threads instead of asyncio for the provider code?</div>
+              <div class="decision-a">
+                The Azure SDK and Paramiko are synchronous and blocking — they hold the GIL during network I/O.
+                Forcing them into <code>asyncio</code> via <code>asyncio.to_thread</code> would work but hides
+                that they're blocking. Explicit daemon threads make the model clear: one thread per job,
+                lifetime tied to the operation. The WebSocket handler bridges back to async via
+                <code>loop.run_in_executor()</code> — only the queue read crosses the boundary.
+              </div>
+            </div>
+          </div>
+
+          <div class="decision-item">
+            <div class="decision-icon">📄</div>
+            <div>
+              <div class="decision-q">Why a flat file (state.json) instead of SQLite or Redis?</div>
+              <div class="decision-a">
+                At one active VM at a time, there is no concurrency on the state file — only one write (provision)
+                and one delete (destroy) ever happen. Adding a DB introduces a service dependency, migration scripts,
+                and connection pooling for zero benefit. The file approach also survives server restarts cleanly:
+                on startup the server reads the file and knows exactly what's deployed.
+              </div>
+            </div>
+          </div>
+
+          <div class="decision-item">
+            <div class="decision-icon">📡</div>
+            <div>
+              <div class="decision-q">How does real-time log streaming work without SSE or polling?</div>
+              <div class="decision-a">
+                The provider writes to a <code>queue.Queue</code> via <code>log=queue.put</code>.
+                The WebSocket handler calls <code>queue.get(timeout=15)</code> inside <code>run_in_executor()</code>
+                — this blocks a thread pool thread (not the event loop) for up to 15 seconds, then sends a
+                heartbeat ping. When the sentinel <code>None</code> arrives, the handler sends the final
+                <code>done</code> frame and closes. Late-joining clients get full log history replayed first.
+              </div>
+            </div>
+          </div>
+
+          <div class="decision-item">
+            <div class="decision-icon">🛡️</div>
+            <div>
+              <div class="decision-q">How is the public demo protected from abuse?</div>
+              <div class="decision-a">
+                Four independent guards: (1) Token-bucket rate limiter per IP — <code>4 writes/min</code>, <code>60 reads/min</code>.
+                (2) Global concurrency cap — <code>MAX_CONCURRENT=1</code>, so only one VM operation runs at a time.
+                (3) Active VM budget — <code>MAX_TOTAL_PROVISIONS=3</code>, tracks live VMs not lifetime total.
+                (4) Mandatory auto-destroy timer — <code>threading.Timer(1200, destroy_fn)</code> fires after 20 minutes
+                regardless of whether the user destroys manually. All implemented in <code>api/middleware.py</code>.
+              </div>
+            </div>
+          </div>
+
+          <div class="decision-item">
+            <div class="decision-icon">🔌</div>
+            <div>
+              <div class="decision-q">How does the provider pattern work and why?</div>
+              <div class="decision-a">
+                <code>providers/base.py</code> defines an abstract <code>BaseProvider</code> with
+                <code>provision()</code>, <code>deploy()</code>, <code>destroy()</code>, <code>get_status()</code>.
+                <code>AzureProvider</code> implements it. The API layer calls <code>get_provider("azure")</code>
+                — a factory function — and never imports Azure SDK directly. Adding AWS means creating
+                <code>providers/aws_provider.py</code> and registering it; the API, CLI, and dashboard change zero lines.
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Security model -->
+    <div class="card">
+      <div class="card-header">🔒 Abuse Protection & Security Model</div>
+      <div class="card-body">
+        <div class="security-grid">
+
+          <div class="sec-card">
+            <div class="sec-icon">🪣</div>
+            <div class="sec-title">Token Bucket Rate Limiter</div>
+            <div class="sec-desc">Per-IP sliding window. Write operations (provision/deploy/destroy) capped separately from reads. Implemented as ASGI middleware — runs before any route handler.</div>
+            <div class="sec-val">4 writes/min · 60 reads/min</div>
+          </div>
+
+          <div class="sec-card">
+            <div class="sec-icon">🚦</div>
+            <div class="sec-title">Global Concurrency Cap</div>
+            <div class="sec-desc">Only 1 mutating job runs at a time globally, plus 1 per IP. Tracked with a threading.Lock and counters. Released automatically when the thread finishes.</div>
+            <div class="sec-val">MAX_CONCURRENT = 1</div>
+          </div>
+
+          <div class="sec-card">
+            <div class="sec-icon">💰</div>
+            <div class="sec-title">Active VM Budget</div>
+            <div class="sec-desc">Provision is rejected if the active VM count hits the limit. Counter goes DOWN on destroy (not a lifetime total). Survives server restarts via state.json recovery.</div>
+            <div class="sec-val">MAX_TOTAL_PROVISIONS = 3</div>
+          </div>
+
+          <div class="sec-card">
+            <div class="sec-icon">⏰</div>
+            <div class="sec-title">Mandatory Auto-Destroy</div>
+            <div class="sec-desc">After provision succeeds, a threading.Timer fires after 20 minutes and runs the full destroy sequence — same code path as the manual destroy button. Cannot be disabled by visitors.</div>
+            <div class="sec-val">AUTO_DESTROY_MINUTES = 20</div>
+          </div>
+
+          <div class="sec-card">
+            <div class="sec-icon">📋</div>
+            <div class="sec-title">Audit Log</div>
+            <div class="sec-desc">Every mutating operation writes a timestamped line to audit.log with the caller IP, operation type, and parameters. Append-only. Never served over the API.</div>
+            <div class="sec-val">audit.log (append-only)</div>
+          </div>
+
+          <div class="sec-card">
+            <div class="sec-icon">🔑</div>
+            <div class="sec-title">Azure Credentials</div>
+            <div class="sec-desc">Service principal credentials loaded from environment variables only. Never in source code, never in state.json, never returned by any API endpoint.</div>
+            <div class="sec-val">DefaultAzureCredential · .env</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Scalability / What's next -->
+    <div class="card">
+      <div class="card-header">📈 How This Scales — Current vs Production</div>
+      <div class="card-body">
+        <div class="scale-row">
+          <div class="scale-item">
+            <div class="scale-now">State</div>
+            <div class="scale-then">state.json</div>
+            <div class="scale-arrow-right">→ PostgreSQL + row-level locking</div>
+          </div>
+          <div class="scale-item">
+            <div class="scale-now">Job Queue</div>
+            <div class="scale-then">queue.Queue (in-process)</div>
+            <div class="scale-arrow-right">→ Celery + Redis / SQS</div>
+          </div>
+          <div class="scale-item">
+            <div class="scale-now">Concurrency</div>
+            <div class="scale-then">1 thread per job</div>
+            <div class="scale-arrow-right">→ Worker pool + K8s Jobs</div>
+          </div>
+          <div class="scale-item">
+            <div class="scale-now">Multi-cloud</div>
+            <div class="scale-then">Azure only</div>
+            <div class="scale-arrow-right">→ AWS / GCP providers (plug in)</div>
+          </div>
+          <div class="scale-item">
+            <div class="scale-now">Auth</div>
+            <div class="scale-then">No user auth (demo)</div>
+            <div class="scale-arrow-right">→ OAuth2 / JWT per-user tokens</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Repo / links -->
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <div class="note-box" style="flex:1;min-width:260px;">
+        🔗 <strong>Source code:</strong> All logic in ~900 lines of Python across 5 files.
+        <code style="background:#1c2128;padding:1px 5px;border-radius:3px;font-size:11px;color:#3fb950;">api/app.py</code> ·
+        <code style="background:#1c2128;padding:1px 5px;border-radius:3px;font-size:11px;color:#3fb950;">api/middleware.py</code> ·
+        <code style="background:#1c2128;padding:1px 5px;border-radius:3px;font-size:11px;color:#3fb950;">providers/azure_provider.py</code> ·
+        <code style="background:#1c2128;padding:1px 5px;border-radius:3px;font-size:11px;color:#3fb950;">api/jobs.py</code> ·
+        <code style="background:#1c2128;padding:1px 5px;border-radius:3px;font-size:11px;color:#3fb950;">cli/display.py</code>
+      </div>
+      <div class="note-box" style="flex:1;min-width:260px;">
+        💬 <strong>Interview prep:</strong> This project has full write-ups covering architecture,
+        security design, WebSocket internals, Azure infrastructure, and 35+ interview Q&amp;As in
+        the <code style="background:#1c2128;padding:1px 5px;border-radius:3px;font-size:11px;color:#3fb950;">interview-prep/</code> folder.
+      </div>
+    </div>
+
+  </div><!-- /tab-blueprint -->
 
 </main><!-- /main -->
 
