@@ -290,16 +290,18 @@ def release_concurrency_slot(ip: str) -> None:
 #      *** PRIMARY WALLET GUARD ***
 # ─────────────────────────────────────────────────────────────────────────────
 
-_provision_lock  = threading.Lock()
-_provision_count : int = 0
+_provision_lock    = threading.Lock()
+_provision_count   : int = 0   # number currently provisioned (active VMs)
+_provision_total   : int = 0   # lifetime total provisions made (never decrements)
 
 
 def check_provision_budget(request: Request) -> None:
     """
     FastAPI dependency — only on POST /provision.
 
-    Raises 403 once MAX_TOTAL_PROVISIONS lifetime provisions have been
-    accepted.  Even with a valid API key, the 101st person can't spin up a VM.
+    Tracks *active* VMs (provisioned minus destroyed).  This means once you
+    destroy a VM the slot is freed and you can provision again — up to
+    MAX_TOTAL_PROVISIONS active VMs at any one time.
 
     Set MAX_TOTAL_PROVISIONS=0 in env to disable the cap entirely.
     """
@@ -315,21 +317,50 @@ def check_provision_budget(request: Request) -> None:
             raise HTTPException(
                 status_code=403,
                 detail=(
-                    f"Provision budget exhausted — this demo allows at most "
-                    f"{_MAX_PROVISIONS} VM provision(s). "
-                    "Contact the site owner to reset the quota."
+                    f"Provision budget full — {_provision_count}/{_MAX_PROVISIONS} "
+                    f"active VM(s) already running. "
+                    "Destroy an existing VM first, then provision a new one."
                 ),
             )
         _provision_count += 1
+        global _provision_total
+        _provision_total += 1
+
+
+def release_provision_slot() -> None:
+    """
+    Decrement the active-VM counter.
+    Called automatically after every successful destroy (manual or auto-destroy).
+    This frees the slot so the user can provision a new VM.
+    """
+    global _provision_count
+    with _provision_lock:
+        _provision_count = max(0, _provision_count - 1)
+
+
+def reset_provision_counter() -> int:
+    """
+    Emergency reset: set the active-VM counter to 0.
+    Returns the old value.
+    Use when VMs were manually deleted via Azure Portal/CLI and the
+    in-memory counter is stuck.  Does NOT touch any Azure resources.
+    """
+    global _provision_count
+    with _provision_lock:
+        old = _provision_count
+        _provision_count = 0
+    return old
 
 
 def get_provision_quota() -> dict:
     """Return current provision usage (exposed via GET /quota)."""
     with _provision_lock:
-        used = _provision_count
+        active  = _provision_count
+        total   = _provision_total
     return {
-        "provisions_used":  used,
-        "provisions_limit": _MAX_PROVISIONS if _MAX_PROVISIONS > 0 else None,
+        "provisions_active":  active,
+        "provisions_limit":   _MAX_PROVISIONS if _MAX_PROVISIONS > 0 else None,
+        "provisions_total":   total,
         "auto_destroy_minutes": _AUTO_DESTROY_MINS if _AUTO_DESTROY_MINS > 0 else None,
     }
 
@@ -368,7 +399,8 @@ def schedule_auto_destroy(
             p.destroy(state, log=log_fn)
             if _os.path.exists(state_file):
                 _os.remove(state_file)
-            log_fn("✅ Auto-destroy complete — all resources deleted.")
+            release_provision_slot()   # free the budget slot so new VMs can be provisioned
+            log_fn("✅ Auto-destroy complete — all resources deleted. Provision slot freed.")
         except Exception as exc:
             log_fn(f"❌ Auto-destroy failed: {exc}")
 

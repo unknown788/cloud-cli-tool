@@ -59,6 +59,8 @@ from api.middleware import (
     check_provision_budget,
     schedule_auto_destroy,
     cancel_auto_destroy,
+    release_provision_slot,
+    reset_provision_counter,
     get_provision_quota,
     get_key_usage,
     write_audit,
@@ -168,7 +170,8 @@ def quota():
     Returns the current abuse-protection counters so the dashboard can
     display a live quota indicator to visitors:
 
-      - provisions_used / provisions_limit
+      - provisions_active / provisions_limit  (active VMs right now)
+      - provisions_total                      (lifetime total, never resets)
       - key_uses_used / key_uses_limit
       - auto_destroy_minutes
 
@@ -176,6 +179,44 @@ def quota():
     show the quota *before* the user enters an API key.
     """
     return {**get_provision_quota(), **get_key_usage()}
+
+
+# ---------------------------------------------------------------------------
+# Admin: manual quota reset  (requires API key — operator use only)
+# ---------------------------------------------------------------------------
+
+@app.post(
+    "/admin/reset-quota",
+    tags=["Admin"],
+    summary="Emergency: manually reset the active-VM counter",
+    dependencies=[Depends(require_api_key)],
+)
+def admin_reset_quota(request: Request):
+    """
+    **Operator-only endpoint.**
+
+    Resets `provisions_active` to 0 without touching Azure.
+    Use this when:
+    - A destroy failed mid-way and the counter is stuck
+    - You manually deleted VMs through the Azure Portal / CLI
+    - The server restarted but state.json still exists from a previous run
+
+    This does NOT destroy any Azure resources — call POST /destroy first
+    if the VM still exists. This only fixes the in-memory counter.
+
+    **Requires X-API-Key header.**
+    """
+    caller_ip = _get_client_ip(request)
+    old = reset_provision_counter()
+    write_audit("ADMIN_RESET_QUOTA", caller_ip, f"was={old}")
+    return {
+        "message": f"Active provision counter reset from {old} → 0.",
+        "warning": (
+            "This only fixes the in-memory counter. "
+            "If VMs still exist in Azure they will NOT be auto-destroyed. "
+            "Run POST /destroy for each one first."
+        ),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -351,6 +392,8 @@ def destroy(req: DestroyRequest, request: Request):
         p.destroy(state, log=log)
         if os.path.exists(STATE_FILE):
             os.remove(STATE_FILE)
+        release_provision_slot()   # free the budget slot → new provision is now allowed
+        log("ℹ️  Provision slot freed. You can provision a new VM.")
 
     job = launch_job("destroy", _destroy_and_cleanup, caller_ip=caller_ip)
     return _job_response(job)
