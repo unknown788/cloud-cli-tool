@@ -184,6 +184,16 @@ class AzureProvider(CloudProvider):
             rsa_key.write_private_key(priv_key_buf)
             ssh_private_key_str = priv_key_buf.getvalue()
 
+            # cloud-init script: installs Docker during VM boot, in parallel
+            # with our resource provisioning — so Docker is ready by the time
+            # SSH connects, avoiding a separate install step (saves ~60-90s).
+            import base64
+            cloud_init = base64.b64encode(b"""#!/bin/bash
+curl -fsSL https://get.docker.com | sh
+systemctl enable docker
+systemctl start docker
+""").decode()
+
             vm_params = {
                 "location": loc,
                 "hardware_profile": {
@@ -200,6 +210,7 @@ class AzureProvider(CloudProvider):
                 "os_profile": {
                     "computer_name": vm,
                     "admin_username": config.admin_username,
+                    "custom_data": cloud_init,
                     "linux_configuration": {
                         "disable_password_authentication": True,
                         "ssh": {
@@ -302,10 +313,17 @@ class AzureProvider(CloudProvider):
             )
             log(f"🔗 SSH connected to {username}@{ip_address}")
 
-            # Install Docker via official convenience script (works on Ubuntu 22.04+)
-            self._exec(ssh, "curl -fsSL https://get.docker.com | sudo sh", log)
-            self._exec(ssh, f"sudo usermod -aG docker {username}", log)
-            log("✅ Docker installed on VM.")
+            # Docker is installed via cloud-init during VM boot.
+            # Wait until the docker daemon is actually ready before proceeding.
+            log("⏳ Waiting for Docker daemon (cloud-init)...")
+            for _ in range(24):   # up to 2 minutes
+                rc = self._exec(ssh, "sudo docker info > /dev/null 2>&1", log, check=False)
+                if rc == 0:
+                    break
+                time.sleep(5)
+            else:
+                raise RuntimeError("Docker daemon did not start within 2 minutes.")
+            log("✅ Docker ready.")
 
             # Upload app + Dockerfile via SFTP
             sftp = ssh.open_sftp()
