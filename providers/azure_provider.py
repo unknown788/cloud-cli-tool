@@ -223,7 +223,11 @@ class AzureProvider(CloudProvider):
                 "admin_username": config.admin_username,
                 "public_ip": ip_result.ip_address,
                 # Derive private key path: strip .pub suffix if present
-                "ssh_private_key_path": ssh_pub_key_path.removesuffix(".pub"),
+                "ssh_private_key_path": (
+                    ssh_pub_key_path[:-4]
+                    if ssh_pub_key_path.endswith(".pub")
+                    else ssh_pub_key_path
+                ),
             }
             log(f"🎉 Provisioning complete! VM reachable at {ip_result.ip_address}")
             return state

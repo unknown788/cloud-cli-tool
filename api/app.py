@@ -369,7 +369,7 @@ def deploy(req: DeployRequest, request: Request):
     status_code=202,
     tags=["Operations"],
     summary="Tear down all cloud resources (async)",
-    dependencies=[Depends(require_api_key), Depends(check_concurrency)],
+    dependencies=[Depends(require_api_key)],
 )
 def destroy(req: DestroyRequest, request: Request):
     """
@@ -378,7 +378,8 @@ def destroy(req: DestroyRequest, request: Request):
 
     ⚠ This is irreversible.
 
-    **Requires X-API-Key header.**
+    Destroy intentionally bypasses the concurrency cap — it must always
+    be allowed so users can clean up even if a previous job is still running.
     """
     state = _load_state()
     try:
@@ -399,7 +400,7 @@ def destroy(req: DestroyRequest, request: Request):
         release_provision_slot()   # free the budget slot → new provision is now allowed
         log("ℹ️  Provision slot freed. You can provision a new VM.")
 
-    job = launch_job("destroy", _destroy_and_cleanup, caller_ip=caller_ip)
+    job = launch_job("destroy", _destroy_and_cleanup, caller_ip=caller_ip, reserved_slot=False)
     return _job_response(job)
 
 

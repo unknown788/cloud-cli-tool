@@ -49,16 +49,19 @@ class Job:
                       concurrency-slot release on completion).
     """
 
-    def __init__(self, operation: str, caller_ip: str = "unknown"):
-        self.job_id:    str            = str(uuid.uuid4())
-        self.operation: str            = operation
-        self.status:    JobStatus      = JobStatus.PENDING
-        self.log_queue: queue.Queue    = queue.Queue()
-        self.logs:      List[str]      = []
-        self.error:     Optional[str]  = None
-        self.result:    Optional[dict] = None
-        self.created_at: str           = datetime.now(timezone.utc).isoformat()
-        self.caller_ip: str            = caller_ip
+    def __init__(self, operation: str, caller_ip: str = "unknown", reserved_slot: bool = True):
+        self.job_id:       str            = str(uuid.uuid4())
+        self.operation:    str            = operation
+        self.status:       JobStatus      = JobStatus.PENDING
+        self.log_queue:    queue.Queue    = queue.Queue()
+        self.logs:         List[str]      = []
+        self.error:        Optional[str]  = None
+        self.result:       Optional[dict] = None
+        self.created_at:   str            = datetime.now(timezone.utc).isoformat()
+        self.caller_ip:    str            = caller_ip
+        # If False, _run_job will NOT release a concurrency slot on completion
+        # (used by destroy, which bypasses check_concurrency intentionally)
+        self.reserved_slot: bool          = reserved_slot
 
     # Convenience properties for response serialisation
     @property
@@ -86,9 +89,9 @@ class JobStore:
         self._jobs: Dict[str, Job] = {}
         self._lock = threading.Lock()
 
-    def create(self, operation: str, caller_ip: str = "unknown") -> Job:
+    def create(self, operation: str, caller_ip: str = "unknown", reserved_slot: bool = True) -> Job:
         """Create a new Job, register it, and return it."""
-        job = Job(operation, caller_ip=caller_ip)
+        job = Job(operation, caller_ip=caller_ip, reserved_slot=reserved_slot)
         with self._lock:
             self._jobs[job.job_id] = job
         return job
@@ -144,20 +147,24 @@ def _run_job(job: Job, fn, *args, **kwargs) -> None:
     finally:
         # Sentinel value: WebSocket consumer stops when it receives None
         job.log_queue.put(None)
-        # Release the concurrency reservation made at HTTP request time
-        release_concurrency_slot(job.caller_ip)
+        # Release the concurrency reservation made at HTTP request time.
+        # Destroy jobs set reserved_slot=False (they bypass check_concurrency)
+        # so we must NOT decrement the counter for them.
+        if job.reserved_slot:
+            release_concurrency_slot(job.caller_ip)
 
 
-def launch_job(operation: str, fn, *args, caller_ip: str = "unknown", **kwargs) -> Job:
+def launch_job(operation: str, fn, *args, caller_ip: str = "unknown", reserved_slot: bool = True, **kwargs) -> Job:
     """
     Create a Job and immediately start a daemon thread to execute fn.
 
     Args:
-        operation : Label string — "provision" | "deploy" | "destroy".
-        fn        : Provider method to call (e.g. azure_provider.provision).
-        *args     : Positional args forwarded to fn (e.g. config).
-        caller_ip : IP of the HTTP caller (used for per-IP concurrency accounting).
-        **kwargs  : Keyword args forwarded to fn (NOT including log=).
+        operation     : Label string — "provision" | "deploy" | "destroy".
+        fn            : Provider method to call (e.g. azure_provider.provision).
+        *args         : Positional args forwarded to fn (e.g. config).
+        caller_ip     : IP of the HTTP caller (used for per-IP concurrency accounting).
+        reserved_slot : Set False for destroy, which bypasses check_concurrency.
+        **kwargs      : Keyword args forwarded to fn (NOT including log=).
 
     Returns:
         The created Job (status=PENDING when returned, RUNNING moments later).
@@ -166,7 +173,7 @@ def launch_job(operation: str, fn, *args, caller_ip: str = "unknown", **kwargs) 
         job = launch_job("provision", provider.provision, config, caller_ip=ip)
         # provider.provision(config, log=_log) runs in background thread
     """
-    job = job_store.create(operation, caller_ip=caller_ip)
+    job = job_store.create(operation, caller_ip=caller_ip, reserved_slot=reserved_slot)
     thread = threading.Thread(
         target=_run_job,
         args=(job, fn, *args),
