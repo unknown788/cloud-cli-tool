@@ -114,7 +114,45 @@ _static_dir = Path(__file__).parent.parent / "static"
 if _static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
-STATE_FILE = "state.json"
+# Always resolve state.json relative to the project root (parent of api/),
+# regardless of what directory the server was launched from.
+STATE_FILE = str(Path(__file__).parent.parent / "state.json")
+
+
+# ---------------------------------------------------------------------------
+# Startup: recover from server crash mid-operation
+# ---------------------------------------------------------------------------
+
+@app.on_event("startup")
+async def _recover_orphaned_state():
+    """
+    If state.json exists when the server starts it means a previous server
+    process was killed while a VM was live (crash, restart, deploy, etc.).
+
+    We log a clear warning so the operator knows the VM is still running
+    in Azure and needs to be destroyed. We do NOT auto-destroy on startup
+    because the VM may be intentionally kept alive across restarts.
+    The /quota and /state endpoints will still reflect the correct state.
+    """
+    if os.path.exists(STATE_FILE):
+        try:
+            with open(STATE_FILE) as f:
+                s = json.load(f)
+            print(
+                f"[STARTUP WARNING] state.json found — VM '{s.get('vm_name')}' "
+                f"at {s.get('public_ip')} may still be running in Azure. "
+                "Use POST /destroy or the dashboard to clean it up."
+            )
+            # Restore the active provision count so /quota is accurate
+            from api.middleware import _provision_lock, _provision_count
+            import threading
+            with _provision_lock:
+                import api.middleware as mw
+                if mw._provision_count == 0:
+                    mw._provision_count = 1
+                    print("[STARTUP] Restored provision count to 1 from state.json.")
+        except Exception as e:
+            print(f"[STARTUP WARNING] Could not read state.json: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -644,17 +682,28 @@ async def websocket_logs(websocket: WebSocket, job_id: str):
         """
         return job.log_queue.get(timeout=15)
 
-    skipped = 0   # count of already-replayed items we consume but don't send
+    skipped   = 0    # count of already-replayed items we consume but don't send
+    ping_count = 0   # how many consecutive timeouts (pings) we've sent
+    MAX_PINGS  = 4   # 4 × 15 s = 60 seconds max wait before declaring job dead
 
     try:
         while True:
             try:
                 item = await loop.run_in_executor(None, _blocking_get)
+                ping_count = 0   # reset on any real message
             except asyncio.CancelledError:
                 # Client disconnected while we were waiting — clean exit.
                 break
             except Exception:
                 # queue.Empty (15 s timeout) — send heartbeat and retry.
+                ping_count += 1
+                if ping_count >= MAX_PINGS:
+                    # Job thread is almost certainly dead (server was restarted
+                    # while the job was running, or the thread crashed without
+                    # sending the sentinel). Force-fail and close cleanly.
+                    job.status = JobStatus.FAILED
+                    job.error  = "Job timed out — the server was likely restarted while this operation was running."
+                    break
                 await send({"type": "ping"})
                 continue
 

@@ -876,7 +876,12 @@ function streamJob(jobId, onResult) {
 
   ws.onerror = () => { termLine('❌ WebSocket connection error', 'err'); setTermStatus('error'); };
   ws.onclose = (evt) => {
-    if (evt.code === 4004) { termLine(`❌ Job not found: ${jobId}`, 'err'); setTermStatus('error'); }
+    if (evt.code === 4004) {
+      termLine('⚠️  Job not found — the server was restarted while this operation was running.', 'err');
+      termLine('   The VM may still exist in Azure. Check the banner above or hit Destroy.', 'err');
+      setTermStatus('error');
+      disableButtons(false);  // re-enable so user can destroy
+    }
   };
 }
 
