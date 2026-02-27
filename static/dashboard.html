@@ -1757,7 +1757,10 @@ document.getElementById('modal-cancel').addEventListener('click', () => {
 });
 document.getElementById('modal-confirm').addEventListener('click', () => {
   document.getElementById('destroy-modal').classList.remove('open');
-  runOperation('/destroy', { provider: getConfig().provider }, () => stopTtlCountdown());
+  runOperation('/destroy', { provider: getConfig().provider }, () => {
+    stopTtlCountdown();
+    window.closeSSHTerminal();
+  });
 });
 
 function disableButtons(disabled) {
