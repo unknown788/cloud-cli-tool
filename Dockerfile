@@ -1,15 +1,32 @@
-# This Dockerfile is used by the 'deploy' command.
-# It serves the generated static dashboard via Nginx.
-FROM nginx:alpine
+# ============================================================
+# CloudLaunch — API Server Image
+# Runs the FastAPI/Uvicorn server that powers the dashboard.
+#
+# Build:
+#   docker build -t cloudlaunch-server .
+#
+# Run (pass credentials via --env-file):
+#   docker run -d --name cloudlaunch \
+#     --env-file .env \
+#     -p 8000:8000 \
+#     cloudlaunch-server
+# ============================================================
 
-# Remove the default Nginx welcome page
-RUN rm -rf /usr/share/nginx/html/*
+FROM python:3.8-slim
 
-# Copy the generated web app into the Nginx serving directory
-COPY sample_app/ /usr/share/nginx/html/
+# Keeps Python from generating .pyc files and enables unbuffered stdout/stderr
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# Expose port 80 for HTTP traffic
-EXPOSE 80
+WORKDIR /app
 
-# Nginx starts automatically as the container's default command
-CMD ["nginx", "-g", "daemon off;"]
+# Install dependencies first (layer cache-friendly)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+EXPOSE 8000
+
+CMD ["python3", "-m", "uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000"]
