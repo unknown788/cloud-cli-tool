@@ -437,6 +437,31 @@
   <!-- ─────────────────── TAB: OPERATIONS ───────────────────────── -->
   <div class="tab-panel" id="tab-ops">
 
+    <!-- VM already exists notice — shown when state.json is present -->
+    <div id="vm-exists-banner" style="display:none;
+      background: linear-gradient(135deg, #0d2818 0%, #0d3320 100%);
+      border: 1px solid #3fb950;
+      border-radius: var(--radius);
+      padding: 14px 20px;
+      display: none;
+      gap: 14px;
+      align-items: center;
+    ">
+      <div style="font-size:24px;flex-shrink:0;">✅</div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:14px;color:#3fb950;margin-bottom:4px;">
+          VM already provisioned
+        </div>
+        <div style="font-size:13px;color:#7ee787;line-height:1.5;">
+          IP: <strong id="vm-exists-ip" style="color:#fff;">—</strong> &nbsp;|&nbsp;
+          Name: <strong id="vm-exists-name" style="color:#fff;">—</strong>
+          &nbsp;— You can <strong>Deploy</strong> your app or <strong>Destroy</strong> when done.
+          <a id="vm-exists-link" href="#" target="_blank" rel="noopener"
+             style="color:#3fb950;margin-left:8px;display:none;">Open app ↗</a>
+        </div>
+      </div>
+    </div>
+
     <!-- "Cloud ain't cheap" warning banner -->
     <div id="cost-warning-banner" style="
       background: linear-gradient(135deg, #1a1200 0%, #2d1f00 100%);
@@ -450,14 +475,13 @@
       <div style="font-size:28px;flex-shrink:0;line-height:1;">💸</div>
       <div>
         <div style="font-weight:700;font-size:14px;color:#e3b341;margin-bottom:6px;">
-          Cloud ain't cheap or free — please destroy when you're done.
+          Cloud ain't cheap — please destroy when you're done.
         </div>
         <div style="font-size:13px;color:#b8922a;line-height:1.6;">
           This demo provisions a <strong style="color:#e3b341">real Azure VM</strong> on a real subscription that costs real money.
           Once you've provisioned and played around — <strong style="color:#e3b341">hit Destroy</strong> before you leave.
           <br>
           Don't worry if you forget: every VM is <strong style="color:#e3b341">automatically destroyed after 20 minutes</strong>.
-          No VM ever lives past that, guaranteed.
         </div>
       </div>
     </div>
@@ -711,7 +735,42 @@ function renderPlan(data) {
 
 document.getElementById('btn-refresh-plan').addEventListener('click', loadPlan);
 loadPlan();
-loadQuota();   // load quota on startup
+loadQuota();    // load quota on startup
+loadVmState();  // check if VM already exists and lock/unlock buttons accordingly
+
+// ── VM state check — prevents double-provision ─────────────────
+async function loadVmState() {
+  const btnProvision = document.getElementById('btn-provision');
+  const btnDeploy    = document.getElementById('btn-deploy');
+  const btnRedeploy  = document.getElementById('btn-redeploy');
+  const btnDestroy   = document.getElementById('btn-destroy');
+  const banner       = document.getElementById('vm-exists-banner');
+  try {
+    const s = await fetchJSON(`${API}/state`);
+    // VM exists — show banner, disable Provision, enable Deploy/Destroy
+    document.getElementById('vm-exists-ip').textContent   = s.public_ip || '—';
+    document.getElementById('vm-exists-name').textContent = s.vm_name   || '—';
+    const link = document.getElementById('vm-exists-link');
+    if (s.public_ip) {
+      link.href = `http://${s.public_ip}`;
+      link.style.display = 'inline';
+    }
+    banner.style.display = 'flex';
+    btnProvision.disabled = true;
+    btnProvision.title    = 'A VM is already provisioned. Destroy it first.';
+    btnDeploy.disabled    = false;
+    btnRedeploy.disabled  = false;
+    btnDestroy.disabled   = false;
+  } catch (_) {
+    // 404 = no VM — show Provision, hide Deploy/Destroy
+    banner.style.display = 'none';
+    btnProvision.disabled = false;
+    btnProvision.title    = '';
+    btnDeploy.disabled    = true;
+    btnRedeploy.disabled  = true;
+    btnDestroy.disabled   = true;
+  }
+}
 
 // ── Terminal helpers ──────────────────────────────────────────────
 const terminal  = document.getElementById('terminal');
@@ -809,6 +868,7 @@ function streamJob(jobId, onResult) {
       case 'done':
         setTermStatus(document.querySelector('#terminal .line.err') ? 'error' : 'done');
         loadJobs();
+        loadVmState();  // re-sync buttons: provision done → lock Provision, destroy done → unlock it
         ws.close();
         break;
     }
@@ -879,9 +939,12 @@ document.getElementById('modal-confirm').addEventListener('click', () => {
 });
 
 function disableButtons(disabled) {
+  // During an operation lock all buttons. On release, loadVmState() will
+  // re-apply the correct per-button state (Provision locked if VM exists, etc.)
   ['btn-provision','btn-deploy','btn-redeploy','btn-destroy'].forEach(id => {
     document.getElementById(id).disabled = disabled;
   });
+  if (!disabled) loadVmState();  // re-sync button states with server reality
 }
 
 // ── Toast notifications ────────────────────────────────────────────

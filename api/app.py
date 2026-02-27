@@ -266,6 +266,29 @@ def get_plan(
 
 
 # ---------------------------------------------------------------------------
+# State  (read-only snapshot of state.json — used by dashboard on load)
+# ---------------------------------------------------------------------------
+
+@app.get(
+    "/state",
+    tags=["Meta"],
+    summary="Return current VM state (404 if no VM provisioned)",
+)
+def get_state():
+    """
+    Returns the contents of state.json so the dashboard can know on page
+    load whether a VM already exists — preventing accidental re-provision.
+
+    Returns 200 + state dict if a VM is provisioned.
+    Returns 404 if no state.json exists (no VM).
+    """
+    if not os.path.exists(STATE_FILE):
+        raise HTTPException(status_code=404, detail="No VM provisioned.")
+    with open(STATE_FILE, "r") as f:
+        return json.load(f)
+
+
+# ---------------------------------------------------------------------------
 # Provision
 # ---------------------------------------------------------------------------
 
@@ -295,6 +318,17 @@ def provision(req: ProvisionRequest, request: Request):
     **Requires X-API-Key header.**
     After AUTO_DESTROY_MINUTES the VM is automatically torn down.
     """
+    # Guard: if a VM is already provisioned (state.json exists), block.
+    # The user must destroy first. This prevents accidental double-provision.
+    if os.path.exists(STATE_FILE):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "A VM is already provisioned. "
+                "Destroy it first before provisioning a new one."
+            ),
+        )
+
     try:
         p = get_provider(req.provider)
     except ValueError as e:
