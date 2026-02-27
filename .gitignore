@@ -1,9 +1,29 @@
 # Python virtual environment
 venv/
 
-# Secret credentials file
+# Secret credentials — never commit
 .env
 
 # Python caches
 __pycache__/
 *.pyc
+*.pyo
+
+# Runtime state — generated at run time, not source
+state.json
+audit.log
+server.log
+uvicorn.log
+nohup.out
+
+# Terminal recordings
+*.cast
+
+# Generated files (built from templates at deploy time)
+sample_app/index.html
+
+# Interview / personal prep notes — not for public repo
+interview-prep/
+
+# OS noise
+.DS_Store

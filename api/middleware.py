@@ -370,7 +370,7 @@ def schedule_auto_destroy(
     _auto_destroy_timer = timer
 
     log_fn("─" * 60)
-    log_fn(f"☁️  Cloud ain't cheap or free.")
+    log_fn(f"☁️  Cloud ain't cheap.")
     log_fn(f"    Please DESTROY this VM when you're done exploring the demo.")
     log_fn(f"    If you forget — no worries, it will self-destruct automatically")
     log_fn(f"    in {_AUTO_DESTROY_MINS} minutes. No action needed from you.")
