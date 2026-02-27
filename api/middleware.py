@@ -4,6 +4,9 @@ api/middleware.py
 Abuse-protection layer for the CloudLaunch public API.
 Designed for a *public portfolio demo* where real Azure money is at stake.
 
+This API is intentionally KEYLESS — any visitor can try the demo.
+All safety comes from hard limits and mandatory auto-destroy.
+
 Guards (applied in order by FastAPI Depends chain):
 ═══════════════════════════════════════════════════
 
@@ -15,38 +18,27 @@ Guards (applied in order by FastAPI Depends chain):
         RATE_LIMIT_READ_RPM   default 60   — reads per IP per minute
         RATE_LIMIT_WRITE_RPM  default 4    — writes per IP per minute
 
-2.  API-Key Authentication  (FastAPI Depends)
-    ─────────────────────────────────────────
-    All mutating endpoints require X-API-Key header.
-    Key is set via API_KEY env var.  If unset → 503 (API closed).
-
-    Optional key-use cap:
-        API_KEY_MAX_USES  default 0 (unlimited)
-    When > 0, the API key becomes invalid after that many successful
-    mutations — a "limited-use token" that you share per visitor.
-
-3.  Global Concurrency + Budget Cap  (FastAPI Depends)
+2.  Global Concurrency + Budget Cap  (FastAPI Depends)
     ─────────────────────────────────────────────────────
     a) MAX_CONCURRENT_JOBS  default 1
        At most N jobs running simultaneously, globally.
 
     b) MAX_TOTAL_PROVISIONS  default 3
-       Hard lifetime cap on how many /provision calls are ever accepted.
-       *** THIS IS YOUR PRIMARY WALLET GUARD ***
-       Once hit, the endpoint returns 403 until you restart.
-       Set to 0 to disable.
+       Hard cap on how many VMs can be *active* at once.
+       *** PRIMARY WALLET GUARD ***
+       Freed when a VM is destroyed.  Set to 0 to disable.
 
     c) MAX_JOBS_PER_IP  default 1
        Per-IP running job cap.
 
-4.  Auto-Destroy TTL  (background timer, started on provision success)
-    ─────────────────────────────────────────────────────────────────
-    A timer fires AUTO_DESTROY_MINUTES (default 30) after a successful
-    provision and automatically tears down all cloud resources.
-    This means even if a visitor walks away, the VM self-destructs.
-    Set AUTO_DESTROY_MINUTES=0 to disable.
+3.  Mandatory Auto-Destroy TTL  (background timer, started on provision)
+    ─────────────────────────────────────────────────────────────────────
+    Every VM is GUARANTEED to self-destruct after AUTO_DESTROY_MINUTES
+    (default 20 min).  There is NO way to opt out — this is non-negotiable
+    for a public keyless demo.  Visitors are clearly warned upfront.
+    Set AUTO_DESTROY_MINUTES=0 to disable (dev/local only).
 
-5.  Ops Audit Log
+4.  Ops Audit Log
     ─────────────────────────────────────────────────
     Every mutating call appends to audit.log:
         2026-02-27T12:34:56Z  PROVISION  1.2.3.4
@@ -76,9 +68,7 @@ _RATE_WRITE_RPM:    int           = int(os.getenv("RATE_LIMIT_WRITE_RPM", "4"))
 _MAX_CONCURRENT:    int           = int(os.getenv("MAX_CONCURRENT_JOBS",   "1"))
 _MAX_PER_IP:        int           = int(os.getenv("MAX_JOBS_PER_IP",       "1"))
 _MAX_PROVISIONS:    int           = int(os.getenv("MAX_TOTAL_PROVISIONS",  "3"))
-_AUTO_DESTROY_MINS: int           = int(os.getenv("AUTO_DESTROY_MINUTES",  "30"))
-_KEY_MAX_USES:      int           = int(os.getenv("API_KEY_MAX_USES",      "0"))  # 0 = unlimited
-_API_KEY:           Optional[str] = os.getenv("API_KEY")
+_AUTO_DESTROY_MINS: int           = int(os.getenv("AUTO_DESTROY_MINUTES",  "20"))
 
 _WRITE_PATHS = {"/provision", "/deploy", "/destroy"}
 
@@ -178,65 +168,27 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 # 2.  API-key authentication  (FastAPI Depends)
 # ─────────────────────────────────────────────────────────────────────────────
 
-_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+# ─────────────────────────────────────────────────────────────────────────────
+# 2.  API-key authentication — REMOVED for public demo
+#     This API is intentionally open.  Safety is provided entirely by
+#     the concurrency cap, provision budget, and mandatory auto-destroy TTL.
+#     require_api_key is kept as a no-op so import sites need no changes.
+# ─────────────────────────────────────────────────────────────────────────────
 
-_key_use_lock  = threading.Lock()
-_key_use_count : int = 0
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 def require_api_key(
     request: Request,
     key: Optional[str] = Depends(_api_key_header),
 ) -> None:
-    """
-    FastAPI dependency for all mutating endpoints.
-
-    - API_KEY not set              → 503  (operator must configure first)
-    - Header missing / wrong       → 401
-    - API_KEY_MAX_USES exceeded    → 403  (key burned out)
-    - Correct key within budget    → passes, increments use counter
-    """
-    global _key_use_count
-
-    if _API_KEY is None:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "This API is not open to the public yet. "
-                "The server operator must set the API_KEY environment variable."
-            ),
-        )
-
-    if key != _API_KEY:
-        ip = _get_client_ip(request)
-        write_audit("AUTH_FAIL", ip, request.url.path)
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or missing API key. Set it in the X-API-Key header.",
-            headers={"WWW-Authenticate": "ApiKey"},
-        )
-
-    if _KEY_MAX_USES > 0:
-        with _key_use_lock:
-            if _key_use_count >= _KEY_MAX_USES:
-                raise HTTPException(
-                    status_code=403,
-                    detail=(
-                        f"This API key has reached its use limit "
-                        f"({_KEY_MAX_USES} operations). Contact the site owner."
-                    ),
-                )
-            _key_use_count += 1
+    """No-op. API is open — any visitor can try the demo."""
+    pass
 
 
 def get_key_usage() -> dict:
-    """Return current key usage (exposed via GET /quota)."""
-    with _key_use_lock:
-        used = _key_use_count
-    return {
-        "key_uses_used":  used,
-        "key_uses_limit": _KEY_MAX_USES if _KEY_MAX_USES > 0 else None,
-    }
+    """Stub — key auth is disabled."""
+    return {"key_uses_used": None, "key_uses_limit": None}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -369,7 +321,8 @@ def get_provision_quota() -> dict:
 # 4.  Auto-destroy TTL
 # ─────────────────────────────────────────────────────────────────────────────
 
-_auto_destroy_timer : Optional[threading.Timer] = None
+_auto_destroy_timer     : Optional[threading.Timer] = None
+_auto_destroy_at_epoch  : Optional[float] = None   # Unix timestamp when destroy will fire
 
 
 def schedule_auto_destroy(
@@ -381,47 +334,66 @@ def schedule_auto_destroy(
     """
     Schedule automatic destroy AUTO_DESTROY_MINUTES minutes from now.
     Returns the Timer so callers can cancel it on manual destroy.
-    Returns None if AUTO_DESTROY_MINUTES == 0 (feature disabled).
+    Returns None if AUTO_DESTROY_MINUTES == 0 (dev/local only — not for prod).
     """
-    global _auto_destroy_timer
+    global _auto_destroy_timer, _auto_destroy_at_epoch
 
     if _AUTO_DESTROY_MINS <= 0:
         return None
+
+    _auto_destroy_at_epoch = time.time() + _AUTO_DESTROY_MINS * 60
 
     def _do_destroy() -> None:
         from providers import get_provider   # lazy import — avoids circular dep
         import os as _os
 
-        log_fn(f"⏰ Auto-destroy triggered (TTL={_AUTO_DESTROY_MINS} min). Tearing down VM…")
+        log_fn("─" * 60)
+        log_fn(f"⏰  AUTO-DESTROY TRIGGERED — TTL of {_AUTO_DESTROY_MINS} min reached.")
+        log_fn("    Tearing down all cloud resources now…")
+        log_fn("─" * 60)
         write_audit("AUTO_DESTROY", "system", f"ttl={_AUTO_DESTROY_MINS}min")
         try:
             p = get_provider(provider_name)
             p.destroy(state, log=log_fn)
             if _os.path.exists(state_file):
                 _os.remove(state_file)
-            release_provision_slot()   # free the budget slot so new VMs can be provisioned
-            log_fn("✅ Auto-destroy complete — all resources deleted. Provision slot freed.")
+            release_provision_slot()
+            log_fn("✅  Auto-destroy complete — all Azure resources deleted.")
+            log_fn("    Provision slot freed. A new VM can now be provisioned.")
         except Exception as exc:
-            log_fn(f"❌ Auto-destroy failed: {exc}")
+            log_fn(f"❌  Auto-destroy failed: {exc}")
 
     timer = threading.Timer(_AUTO_DESTROY_MINS * 60, _do_destroy)
     timer.daemon = True
     timer.name   = "auto-destroy"
     timer.start()
     _auto_destroy_timer = timer
-    log_fn(
-        f"⚠️  This VM will be automatically destroyed in {_AUTO_DESTROY_MINS} min. "
-        "Click Destroy manually before then to cancel the timer."
-    )
+
+    log_fn("─" * 60)
+    log_fn(f"☁️  Cloud ain't cheap or free.")
+    log_fn(f"    Please DESTROY this VM when you're done exploring the demo.")
+    log_fn(f"    If you forget — no worries, it will self-destruct automatically")
+    log_fn(f"    in {_AUTO_DESTROY_MINS} minutes. No action needed from you.")
+    log_fn("─" * 60)
+
     return timer
+
+
+def get_auto_destroy_epoch() -> Optional[float]:
+    """Return the Unix timestamp when auto-destroy will fire, or None."""
+    global _auto_destroy_timer, _auto_destroy_at_epoch
+    if _auto_destroy_timer and _auto_destroy_timer.is_alive():
+        return _auto_destroy_at_epoch
+    return None
 
 
 def cancel_auto_destroy() -> bool:
     """Cancel the pending auto-destroy timer. Returns True if one was active."""
-    global _auto_destroy_timer
+    global _auto_destroy_timer, _auto_destroy_at_epoch
     if _auto_destroy_timer and _auto_destroy_timer.is_alive():
         _auto_destroy_timer.cancel()
         _auto_destroy_timer = None
+        _auto_destroy_at_epoch = None
         write_audit("AUTO_DESTROY_CANCELLED", "manual")
         return True
     return False

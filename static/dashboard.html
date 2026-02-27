@@ -196,6 +196,7 @@
     .dot.done     { background: #3fb950; }
     .dot.error    { background: #f85149; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+    @keyframes ttl-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(248,81,73,0)} 50%{box-shadow:0 0 8px 3px rgba(248,81,73,0.45)} }
 
     /* ── Plan table ──────────────────────────────────────────────── */
     table { width: 100%; border-collapse: collapse; }
@@ -363,9 +364,9 @@
   <div id="quota-badge" title="Remaining provision quota" style="display:none;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;background:#3d2c00;color:#e3b341;margin-right:8px;cursor:default;">
     ⚡ <span id="quota-text">? / ?</span> VMs
   </div>
-  <!-- Auto-destroy countdown -->
-  <div id="ttl-badge" style="display:none;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;background:#3d0000;color:#f85149;margin-right:8px;cursor:default;">
-    ⏰ Auto-destroy: <span id="ttl-countdown">--:--</span>
+  <!-- Auto-destroy countdown — shown once a VM is provisioned -->
+  <div id="ttl-badge" style="display:none;padding:4px 14px;border-radius:20px;font-size:13px;font-weight:700;background:#3d0000;color:#f85149;margin-right:8px;cursor:default;letter-spacing:0.3px;animation:ttl-pulse 2s ease-in-out infinite;">
+    ⏰ Auto-destroying in <span id="ttl-countdown">--:--</span>
   </div>
   <div id="vm-status-badge" class="unknown">⬤ No VM</div>
 </header>
@@ -436,22 +437,35 @@
   <!-- ─────────────────── TAB: OPERATIONS ───────────────────────── -->
   <div class="tab-panel" id="tab-ops">
 
+    <!-- "Cloud ain't cheap" warning banner -->
+    <div id="cost-warning-banner" style="
+      background: linear-gradient(135deg, #1a1200 0%, #2d1f00 100%);
+      border: 1px solid #e3b341;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    ">
+      <div style="font-size:28px;flex-shrink:0;line-height:1;">💸</div>
+      <div>
+        <div style="font-weight:700;font-size:14px;color:#e3b341;margin-bottom:6px;">
+          Cloud ain't cheap or free — please destroy when you're done.
+        </div>
+        <div style="font-size:13px;color:#b8922a;line-height:1.6;">
+          This demo provisions a <strong style="color:#e3b341">real Azure VM</strong> on a real subscription that costs real money.
+          Once you've provisioned and played around — <strong style="color:#e3b341">hit Destroy</strong> before you leave.
+          <br>
+          Don't worry if you forget: every VM is <strong style="color:#e3b341">automatically destroyed after 20 minutes</strong>.
+          No VM ever lives past that, guaranteed.
+        </div>
+      </div>
+    </div>
+
     <!-- Config form -->
     <div class="card">
       <div class="card-header">⚙ Configuration</div>
       <div class="card-body">
-        <!-- API key row — full width, prominent -->
-        <div class="field" style="grid-column:1/-1;margin-bottom:4px;">
-          <label>🔑 API Key <span style="color:#f85149;font-weight:700">*</span>
-            <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0"> — required to run operations</span>
-          </label>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <input id="cfg-api-key" type="password" placeholder="Paste the key you received from the site owner"
-              style="flex:1" oninput="onApiKeyChange()" />
-            <button class="btn" onclick="toggleKeyVisibility()" id="btn-show-key" style="padding:8px 12px;font-size:12px;">👁</button>
-          </div>
-          <div id="key-status" style="font-size:11px;margin-top:4px;color:var(--muted)">Enter the API key above to enable operations.</div>
-        </div>
         <div class="form-grid">
           <div class="field">
             <label>Cloud Provider</label>
@@ -554,15 +568,17 @@
 <!-- ═══════════════════════ DESTROY MODAL ════════════════════════ -->
 <div class="modal-overlay" id="destroy-modal">
   <div class="modal">
-    <h3>💀 Confirm Destroy</h3>
+    <h3>💀 Destroy the VM</h3>
     <p>
-      This will permanently delete the entire resource group and
-      <strong>all</strong> cloud resources inside it. This action
-      cannot be undone.
+      This deletes the entire Azure resource group and <strong>all</strong>
+      resources inside it. It also frees the provision slot so the next
+      visitor can try the demo.
+      <br><br>
+      <strong style="color:#3fb950">👍 Thank you for destroying — cloud ain't cheap!</strong>
     </p>
     <div class="modal-actions">
-      <button class="btn" id="modal-cancel">Cancel</button>
-      <button class="btn danger" id="modal-confirm">Yes, destroy everything</button>
+      <button class="btn" id="modal-cancel">Keep it running</button>
+      <button class="btn danger" id="modal-confirm">💀 Yes, destroy & free the slot</button>
     </div>
   </div>
 </div>
@@ -595,39 +611,8 @@ document.getElementById('btn-goto-ops').addEventListener('click', () => {
   document.querySelector('[data-tab="ops"]').click();
 });
 
-// ── API key helpers ───────────────────────────────────────────────
-function apiKey() {
-  return document.getElementById('cfg-api-key').value.trim();
-}
-
-function toggleKeyVisibility() {
-  const inp = document.getElementById('cfg-api-key');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-}
-
-function onApiKeyChange() {
-  const key = apiKey();
-  const status = document.getElementById('key-status');
-  if (!key) {
-    status.textContent = 'Enter the API key above to enable operations.';
-    status.style.color = 'var(--muted)';
-    setOpsEnabled(false);
-  } else {
-    status.textContent = '✓ Key entered — operations enabled.';
-    status.style.color = '#3fb950';
-    setOpsEnabled(true);
-  }
-}
-
-function setOpsEnabled(enabled) {
-  ['btn-provision','btn-deploy','btn-redeploy','btn-destroy'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.disabled = !enabled;
-  });
-}
-
-// Disable op buttons until a key is entered
-setOpsEnabled(false);
+// ── API key helpers — REMOVED (API is now open/keyless) ──────────
+function apiKey() { return ''; }   // stub — kept so fetchJSON doesn't break
 
 // ── Quota / budget display ────────────────────────────────────────
 async function loadQuota() {
@@ -635,23 +620,29 @@ async function loadQuota() {
     const q = await fetchJSON(`${API}/quota`);
     _quotaData = q;
 
+    // Quota badge
     const badge = document.getElementById('quota-badge');
     const text  = document.getElementById('quota-text');
     if (q.provisions_limit !== null && q.provisions_limit !== undefined) {
-      const remaining = q.provisions_limit - q.provisions_used;
-      text.textContent = `${q.provisions_used} / ${q.provisions_limit}`;
+      const active    = q.provisions_active ?? 0;
+      const remaining = q.provisions_limit - active;
+      text.textContent = `${active} / ${q.provisions_limit}`;
       badge.style.display = 'inline-block';
-      // Colour-code: green = plenty, amber = low, red = exhausted
       if (remaining <= 0) {
         badge.style.background = '#3d0000'; badge.style.color = '#f85149';
-        badge.title = 'Provision budget exhausted — no more VMs can be created.';
+        badge.title = 'All slots occupied — destroy a VM first.';
       } else if (remaining === 1) {
         badge.style.background = '#3d2c00'; badge.style.color = '#e3b341';
-        badge.title = `1 provision remaining.`;
+        badge.title = `1 slot remaining.`;
       } else {
         badge.style.background = '#1a4731'; badge.style.color = '#3fb950';
-        badge.title = `${remaining} provision(s) remaining.`;
+        badge.title = `${remaining} slot(s) remaining.`;
       }
+    }
+
+    // If auto_destroy_at is set, start the countdown from the server epoch
+    if (q.auto_destroy_at) {
+      startTtlCountdown(q.auto_destroy_at * 1000);   // server returns Unix seconds
     }
   } catch (_) { /* quota display is best-effort */ }
 }
@@ -804,12 +795,8 @@ function streamJob(jobId, onResult) {
           terminal.scrollTop = terminal.scrollHeight;
           updateBadge('running');
           refreshStatus();
-          // Start TTL countdown if quota endpoint has auto_destroy_minutes
-          if (_quotaData?.auto_destroy_minutes) {
-            const destroyAt = Date.now() + _quotaData.auto_destroy_minutes * 60 * 1000;
-            startTtlCountdown(destroyAt);
-          }
-          loadQuota();   // refresh usage counters
+          // Refresh quota — this will pick up auto_destroy_at and start the countdown
+          loadQuota();
         }
         if (onResult) onResult(frame.data);
         break;
@@ -835,10 +822,6 @@ function streamJob(jobId, onResult) {
 
 // ── Launch operation ──────────────────────────────────────────────
 async function runOperation(endpoint, body = {}, onResult) {
-  if (!apiKey()) {
-    showToast('Enter your API key first.', 'error');
-    return;
-  }
   termClear();
   termLine(`▶  POST ${endpoint}`, 'dim');
   setTermStatus('running');
@@ -860,7 +843,6 @@ async function runOperation(endpoint, body = {}, onResult) {
     showToast(e.message, 'error');
   } finally {
     disableButtons(false);
-    if (apiKey()) setOpsEnabled(true);  // re-enable based on key presence
   }
 }
 

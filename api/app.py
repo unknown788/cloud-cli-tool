@@ -61,6 +61,7 @@ from api.middleware import (
     cancel_auto_destroy,
     release_provision_slot,
     reset_provision_counter,
+    get_auto_destroy_epoch,
     get_provision_quota,
     get_key_usage,
     write_audit,
@@ -172,13 +173,16 @@ def quota():
 
       - provisions_active / provisions_limit  (active VMs right now)
       - provisions_total                      (lifetime total, never resets)
-      - key_uses_used / key_uses_limit
       - auto_destroy_minutes
+      - auto_destroy_at                       (Unix epoch when next auto-destroy fires)
 
-    This endpoint is intentionally unauthenticated so the dashboard can
-    show the quota *before* the user enters an API key.
+    Intentionally unauthenticated.
     """
-    return {**get_provision_quota(), **get_key_usage()}
+    return {
+        **get_provision_quota(),
+        **get_key_usage(),
+        "auto_destroy_at": get_auto_destroy_epoch(),
+    }
 
 
 # ---------------------------------------------------------------------------
