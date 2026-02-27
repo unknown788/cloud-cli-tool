@@ -14,6 +14,9 @@ state.json
 audit.log
 server.log
 uvicorn.log
+
+# Private infra registry — contains IDs, keep off GitHub
+DEPLOYMENT.md
 nohup.out
 
 # Terminal recordings
